@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import time
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from config import settings
 from storage import Store
@@ -21,6 +22,26 @@ app = FastAPI(title="Pattern Intelligence Research Gateway", version="0.1.0")
 store = Store(settings.db_path)
 
 
+class TradingViewEvent(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    type: Literal["research_candidate", "jev_candidate"]
+    event_id: str = Field(min_length=5, max_length=256)
+    symbol: str = Field(min_length=1, max_length=128)
+    tf: str = Field(min_length=1, max_length=32)
+    time: int = Field(gt=0)
+    side: Literal["long", "short"]
+    family: Literal["reversal", "continuation"] | None = None
+    grouped_score: float | None = Field(default=None, ge=0, le=100)
+    score: float | None = Field(default=None, ge=0, le=100)
+    legacy_score: float | None = Field(default=None, ge=0, le=100)
+    rr: float | None = None
+    entry: float
+    stop: float
+    target: float | None = None
+    a_plus: bool = False
+
+
 class JevDecision(BaseModel):
     event_id: str
     action: str = Field(pattern="^(ACCEPT|ABSTAIN)$")
@@ -31,6 +52,10 @@ class JevDecision(BaseModel):
     toxic_flow: bool | None = None
     execution_environment: str | None = None
     reason: str | None = None
+
+
+def _token_ok(got: str, expected: str) -> bool:
+    return hmac.compare_digest(got.encode(), expected.encode())
 
 
 def _normalized_symbol(raw: str, venue: str) -> str:
@@ -95,11 +120,11 @@ def health() -> dict[str, Any]:
 
 
 @app.post("/webhook/tradingview/{token}")
-async def tradingview(token: str, payload: dict[str, Any], background: BackgroundTasks) -> dict[str, Any]:
-    if token != settings.webhook_token:
+async def tradingview(token: str, event: TradingViewEvent, background: BackgroundTasks) -> dict[str, Any]:
+    if not _token_ok(token, settings.webhook_token):
         raise HTTPException(404, "not found")
-    if payload.get("type") not in {"research_candidate", "jev_candidate"}:
-        raise HTTPException(422, "unsupported payload type")
+    payload = event.model_dump()
+    payload.update(event.model_extra or {})
     created, event_id = store.insert_event(payload)
     if created:
         background.add_task(_enrich, event_id, payload)
@@ -108,7 +133,7 @@ async def tradingview(token: str, payload: dict[str, Any], background: Backgroun
 
 @app.post("/webhook/jev/{token}")
 def jev(token: str, decision: JevDecision) -> dict[str, Any]:
-    if token != settings.jev_token:
+    if not _token_ok(token, settings.jev_token):
         raise HTTPException(404, "not found")
     event = store.get_event(decision.event_id)
     if event is None:
