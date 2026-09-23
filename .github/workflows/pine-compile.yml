@@ -1,0 +1,30 @@
+name: Pine Compile
+on:
+  push:
+    paths:
+      - 'indicator.pine'
+      - '.github/workflows/pine-compile.yml'
+  workflow_dispatch:
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clone TradingView MCP
+        run: git clone --depth 1 https://github.com/tradesdontlie/tradingview-mcp.git tv-mcp
+      - name: Install MCP dependencies
+        working-directory: tv-mcp
+        run: npm ci
+      - name: Compile Pine via TradingView MCP
+        shell: bash
+        run: |
+          cat > /tmp/check.mjs <<'EOF'
+          import fs from 'node:fs';
+          import { check } from '${{ github.workspace }}/tv-mcp/src/core/pine.js';
+          const source = fs.readFileSync('${{ github.workspace }}/indicator.pine', 'utf8');
+          const result = await check({ source });
+          console.log('PINE_CHECK_RESULT=' + JSON.stringify(result));
+          if (!result.compiled) process.exit(1);
+          EOF
+          node /tmp/check.mjs
