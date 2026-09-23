@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TradingView Research Candidate",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["type","event_id","symbol","tf","time","side","entry","stop","a_plus"],
+  "properties": {
+    "type": {"enum": ["research_candidate","jev_candidate"]},
+    "event_id": {"type":"string","minLength":5,"maxLength":256},
+    "symbol": {"type":"string","minLength":1},
+    "tf": {"type":"string","minLength":1},
+    "time": {"type":"integer","minimum":1},
+    "side": {"enum":["long","short"]},
+    "family": {"enum":["reversal","continuation"]},
+    "grouped_score": {"type":["number","null"],"minimum":0,"maximum":100},
+    "legacy_score": {"type":["number","null"],"minimum":0,"maximum":100},
+    "score": {"type":["number","null"],"minimum":0,"maximum":100},
+    "rr": {"type":["number","null"]},
+    "entry": {"type":"number"},
+    "stop": {"type":"number"},
+    "target": {"type":["number","null"]},
+    "a_plus": {"type":"boolean"}
+  }
+}
