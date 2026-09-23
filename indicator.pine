@@ -1,5 +1,5 @@
 //@version=6
-indicator("Advanced Pattern Intelligence System v3.1 — SMC Fusion + Jev", overlay=true, max_bars_back=1000, max_lines_count=500, max_labels_count=500, max_boxes_count=200, dynamic_requests=true)
+indicator("Advanced Pattern Intelligence System v3.2 — Research Calibrated SMC Fusion", overlay=true, max_bars_back=1000, max_lines_count=500, max_labels_count=500, max_boxes_count=200, dynamic_requests=true)
 
 // ============================================================
 // INPUTS
