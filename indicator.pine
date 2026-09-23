@@ -1028,6 +1028,35 @@ if detectSequence
     f_add_pattern(patterns, f_detect_sequence(true))
     f_add_pattern(patterns, f_detect_sequence(false))
 
+if detectEqualLiq and equalHigh
+    f_add_pattern(patterns, PatternInfo.new("Equal Highs / BSL", "bearish", 58.0 + (weakHigh ? 10.0 : 0.0), "Liquidity Pool", nz(prevHighBar, bar_index), bar_index, math.max(lastHigh, prevHigh), math.min(lastHigh, prevHigh), na, "External buy-side liquidity\n" + (weakHigh ? "Weak high in bullish structure" : "Await sweep/rejection")))
+if detectEqualLiq and equalLow
+    f_add_pattern(patterns, PatternInfo.new("Equal Lows / SSL", "bullish", 58.0 + (weakLow ? 10.0 : 0.0), "Liquidity Pool", nz(prevLowBar, bar_index), bar_index, math.max(lastLow, prevLow), math.min(lastLow, prevLow), na, "External sell-side liquidity\n" + (weakLow ? "Weak low in bearish structure" : "Await sweep/reclaim")))
+
+if detectOB and bullObRetrace
+    f_add_pattern(patterns, PatternInfo.new("Bullish Order Block", "bullish", f_clamp(55.0 + (bullOrdered ? 15.0 : 0.0) + (bullOteEntry ? 8.0 : 0.0) + (bullSmtRecent ? 6.0 : 0.0), 1.0, 99.0), "Mitigation", nz(bullObBar, bar_index), bar_index, bullObTop, bullObBottom, bullDOL, "Last bearish candle before displacement\nMitigation active"))
+if detectOB and bearObRetrace
+    f_add_pattern(patterns, PatternInfo.new("Bearish Order Block", "bearish", f_clamp(55.0 + (bearOrdered ? 15.0 : 0.0) + (bearOteEntry ? 8.0 : 0.0) + (bearSmtRecent ? 6.0 : 0.0), 1.0, 99.0), "Mitigation", nz(bearObBar, bar_index), bar_index, bearObTop, bearObBottom, bearDOL, "Last bullish candle before displacement\nMitigation active"))
+
+if detectIFVG and bullIfvgRetrace
+    f_add_pattern(patterns, PatternInfo.new("Bullish IFVG", "bullish", f_clamp(60.0 + (bullOrdered ? 12.0 : 0.0) + (bullNarrative ? 8.0 : 0.0), 1.0, 99.0), "Reclaim", nz(bullIfvgBar, bar_index), bar_index, bullIfvgTop, bullIfvgBottom, bullDOL, "Bearish imbalance flipped to support\nRetracement into IFVG"))
+if detectIFVG and bearIfvgRetrace
+    f_add_pattern(patterns, PatternInfo.new("Bearish IFVG", "bearish", f_clamp(60.0 + (bearOrdered ? 12.0 : 0.0) + (bearNarrative ? 8.0 : 0.0), 1.0, 99.0), "Rejection", nz(bearIfvgBar, bar_index), bar_index, bearIfvgTop, bearIfvgBottom, bearDOL, "Bullish imbalance flipped to resistance\nRetracement into IFVG"))
+
+if detectOTE and bullOteEntry
+    f_add_pattern(patterns, PatternInfo.new("Bullish OTE", "bullish", f_clamp(52.0 + (bullOrdered ? 18.0 : 0.0) + (bullSmtRecent ? 6.0 : 0.0) + (bullDivRecent ? 4.0 : 0.0), 1.0, 99.0), "0.62-0.79", bar_index, bar_index, bullOteUpper, bullOteLower, bullDOL, "Discount retracement\n0.705 sweet spot " + str.tostring(bullOteSweet, format.mintick)))
+if detectOTE and bearOteEntry
+    f_add_pattern(patterns, PatternInfo.new("Bearish OTE", "bearish", f_clamp(52.0 + (bearOrdered ? 18.0 : 0.0) + (bearSmtRecent ? 6.0 : 0.0) + (bearDivRecent ? 4.0 : 0.0), 1.0, 99.0), "0.62-0.79", bar_index, bar_index, bearOteUpper, bearOteLower, bearDOL, "Premium retracement\n0.705 sweet spot " + str.tostring(bearOteSweet, format.mintick)))
+
+if bullExecutionReady
+    string rrTxt = na(bullRR) ? "n/a" : str.tostring(bullRR, "#.1") + "R"
+    string evidence = "ORDERED Sweep > MSS > Disp > FVG\nEntry PD array: " + (bullOteEntry ? "OTE " : "") + (bullFvgRetrace ? "FVG " : "") + (bullIfvgRetrace ? "IFVG " : "") + (bullObRetrace ? "OB" : "") + "\nSMT " + (bullSmtRecent ? "Y" : "N") + " | RSI div " + (bullDivRecent ? "Y" : "N") + " | KZ " + (inKillzone ? "Y" : "N") + "\nDOL RR " + rrTxt
+    f_add_pattern(patterns, PatternInfo.new("Bullish ICT Execution Stack", "bullish", bullSetupScore, "ENTRY ZONE", nz(bullSweepEventBar, bar_index), bar_index, bullEntry, bullStop, bullDOL, evidence))
+if bearExecutionReady
+    string rrTxt = na(bearRR) ? "n/a" : str.tostring(bearRR, "#.1") + "R"
+    string evidence = "ORDERED Sweep > MSS > Disp > FVG\nEntry PD array: " + (bearOteEntry ? "OTE " : "") + (bearFvgRetrace ? "FVG " : "") + (bearIfvgRetrace ? "IFVG " : "") + (bearObRetrace ? "OB" : "") + "\nSMT " + (bearSmtRecent ? "Y" : "N") + " | RSI div " + (bearDivRecent ? "Y" : "N") + " | KZ " + (inKillzone ? "Y" : "N") + "\nDOL RR " + rrTxt
+    f_add_pattern(patterns, PatternInfo.new("Bearish ICT Execution Stack", "bearish", bearSetupScore, "ENTRY ZONE", nz(bearSweepEventBar, bar_index), bar_index, bearStop, bearEntry, bearDOL, evidence))
+
 f_sort_patterns(patterns)
 
 // ============================================================
@@ -1045,6 +1074,33 @@ fill(bullFvgTopPlot, bullFvgBotPlot, color=color.new(color.lime, 92))
 bearFvgTopPlot = plot(showFVGZones ? bearFvgTop : na, "Bear FVG Top", color=color.new(color.red, 80), style=plot.style_linebr)
 bearFvgBotPlot = plot(showFVGZones ? bearFvgBottom : na, "Bear FVG Bottom", color=color.new(color.red, 80), style=plot.style_linebr)
 fill(bearFvgTopPlot, bearFvgBotPlot, color=color.new(color.red, 92))
+
+bullObTopPlot = plot(showOBZones ? bullObTop : na, "Bull OB Top", color=color.new(color.teal, 72), style=plot.style_linebr)
+bullObBotPlot = plot(showOBZones ? bullObBottom : na, "Bull OB Bottom", color=color.new(color.teal, 72), style=plot.style_linebr)
+fill(bullObTopPlot, bullObBotPlot, color=color.new(color.teal, 92))
+bearObTopPlot = plot(showOBZones ? bearObTop : na, "Bear OB Top", color=color.new(color.orange, 72), style=plot.style_linebr)
+bearObBotPlot = plot(showOBZones ? bearObBottom : na, "Bear OB Bottom", color=color.new(color.orange, 72), style=plot.style_linebr)
+fill(bearObTopPlot, bearObBotPlot, color=color.new(color.orange, 92))
+
+bullIfvgTopPlot = plot(showIFVGZones ? bullIfvgTop : na, "Bull IFVG Top", color=color.new(color.aqua, 72), style=plot.style_linebr)
+bullIfvgBotPlot = plot(showIFVGZones ? bullIfvgBottom : na, "Bull IFVG Bottom", color=color.new(color.aqua, 72), style=plot.style_linebr)
+fill(bullIfvgTopPlot, bullIfvgBotPlot, color=color.new(color.aqua, 93))
+bearIfvgTopPlot = plot(showIFVGZones ? bearIfvgTop : na, "Bear IFVG Top", color=color.new(color.fuchsia, 72), style=plot.style_linebr)
+bearIfvgBotPlot = plot(showIFVGZones ? bearIfvgBottom : na, "Bear IFVG Bottom", color=color.new(color.fuchsia, 72), style=plot.style_linebr)
+fill(bearIfvgTopPlot, bearIfvgBotPlot, color=color.new(color.fuchsia, 93))
+
+bullOteUpPlot = plot(showOTEZones and (structBull or bullCHOCH) ? bullOteUpper : na, "Bull OTE 0.62", color=color.new(color.lime, 82), style=plot.style_linebr)
+bullOteLoPlot = plot(showOTEZones and (structBull or bullCHOCH) ? bullOteLower : na, "Bull OTE 0.79", color=color.new(color.lime, 82), style=plot.style_linebr)
+fill(bullOteUpPlot, bullOteLoPlot, color=color.new(color.lime, 95))
+bearOteUpPlot = plot(showOTEZones and (structBear or bearCHOCH) ? bearOteUpper : na, "Bear OTE 0.79", color=color.new(color.red, 82), style=plot.style_linebr)
+bearOteLoPlot = plot(showOTEZones and (structBear or bearCHOCH) ? bearOteLower : na, "Bear OTE 0.62", color=color.new(color.red, 82), style=plot.style_linebr)
+fill(bearOteUpPlot, bearOteLoPlot, color=color.new(color.red, 95))
+
+plot(showDOL ? pdh : na, "Previous Day High", color=color.new(color.yellow, 65), linewidth=1, style=plot.style_stepline)
+plot(showDOL ? pdl : na, "Previous Day Low", color=color.new(color.yellow, 65), linewidth=1, style=plot.style_stepline)
+plot(showDOL ? pwh : na, "Previous Week High", color=color.new(color.blue, 70), linewidth=1, style=plot.style_stepline)
+plot(showDOL ? pwl : na, "Previous Week Low", color=color.new(color.blue, 70), linewidth=1, style=plot.style_stepline)
+plot(showOTEZones ? dealingMid : na, "Dealing Range EQ", color=color.new(color.gray, 85), linewidth=1, style=plot.style_linebr)
 
 var array<line> drawLines = array.new<line>()
 var array<label> drawLabels = array.new<label>()
@@ -1078,12 +1134,15 @@ if barstate.islast
 // ============================================================
 var table matrix = na
 var table explain = na
+var table execution = na
 
 if barstate.isfirst
     if showTable
         matrix := table.new(f_pos(tablePosition), 4, maxPatterns + 1, bgcolor=color.new(color.black, panelTransparency), border_width=1)
     if showExplanation
         explain := table.new(f_pos(explainPosition), 2, maxPatterns + 1, bgcolor=color.new(color.black, panelTransparency), border_width=1)
+    if showExecutionPanel
+        execution := table.new(f_pos(executionPosition), 2, 9, bgcolor=color.new(color.black, panelTransparency), border_width=1)
 
 if barstate.islast
     string textSize = f_size(panelTextSize)
@@ -1127,6 +1186,36 @@ if barstate.islast
             table.cell(explain, 0, 1, "No pattern", text_color=color.gray, text_size=textSize)
             table.cell(explain, 1, 1, "Waiting for confirmed structure", text_color=color.gray, text_size=textSize)
 
+    if showExecutionPanel and not na(execution)
+        bool bullLead = bullSetupScore >= bearSetupScore
+        string leadDir = bullLead ? "BULL" : "BEAR"
+        float leadScore = bullLead ? bullSetupScore : bearSetupScore
+        float leadRR = bullLead ? bullRR : bearRR
+        string life = bullLead ? (bullOrdered ? "ORDERED" : "BUILDING") : (bearOrdered ? "ORDERED" : "BUILDING")
+        string entryState = bullLead ? (bullOteEntry ? "OTE" : bullFvgRetrace ? "FVG" : bullIfvgRetrace ? "IFVG" : bullObRetrace ? "OB" : "WAIT") : (bearOteEntry ? "OTE" : bearFvgRetrace ? "FVG" : bearIfvgRetrace ? "IFVG" : bearObRetrace ? "OB" : "WAIT")
+        string mtfState = (htfBull ? "HTF+" : htfBear ? "HTF-" : "HTF=") + " / " + (midBull ? "MTF+" : midBear ? "MTF-" : "MTF=")
+        string divState = bullLead ? "SMT " + (bullSmtRecent ? "Y" : "N") + " | DIV " + (bullDivRecent ? "Y" : "N") : "SMT " + (bearSmtRecent ? "Y" : "N") + " | DIV " + (bearDivRecent ? "Y" : "N")
+        string regime = coilActive ? "COIL" : expansionRegime ? "EXPANSION" : trendRegime ? "TREND" : "RANGE"
+        string sess = inLondon ? "LONDON" : inNY ? "NEW YORK" : "OFF-KZ"
+        table.cell(execution, 0, 0, "Execution Vector", bgcolor=color.new(color.navy, 20), text_color=color.white, text_size=textSize)
+        table.cell(execution, 1, 0, leadDir + " " + str.tostring(leadScore, "#") + "%", bgcolor=color.new(bullLead ? color.green : color.red, 35), text_color=color.white, text_size=textSize)
+        table.cell(execution, 0, 1, "Lifecycle", text_color=color.silver, text_size=textSize)
+        table.cell(execution, 1, 1, life, text_color=life == "ORDERED" ? color.lime : color.yellow, text_size=textSize)
+        table.cell(execution, 0, 2, "Entry PD Array", text_color=color.silver, text_size=textSize)
+        table.cell(execution, 1, 2, entryState, text_color=entryState == "WAIT" ? color.gray : color.aqua, text_size=textSize)
+        table.cell(execution, 0, 3, "DOL RR", text_color=color.silver, text_size=textSize)
+        table.cell(execution, 1, 3, na(leadRR) ? "n/a" : str.tostring(leadRR, "#.1") + "R", text_color=not na(leadRR) and leadRR >= minTargetRR ? color.lime : color.yellow, text_size=textSize)
+        table.cell(execution, 0, 4, "Narrative", text_color=color.silver, text_size=textSize)
+        table.cell(execution, 1, 4, mtfState, text_color=color.white, text_size=textSize)
+        table.cell(execution, 0, 5, "Divergence", text_color=color.silver, text_size=textSize)
+        table.cell(execution, 1, 5, divState, text_color=color.white, text_size=textSize)
+        table.cell(execution, 0, 6, "Regime", text_color=color.silver, text_size=textSize)
+        table.cell(execution, 1, 6, regime + " | ADX " + str.tostring(adx, "#"), text_color=color.white, text_size=textSize)
+        table.cell(execution, 0, 7, "VWAP Z", text_color=color.silver, text_size=textSize)
+        table.cell(execution, 1, 7, str.tostring(vwapZ, "#.2") + " | " + sess, text_color=color.white, text_size=textSize)
+        table.cell(execution, 0, 8, "Liquidity", text_color=color.silver, text_size=textSize)
+        table.cell(execution, 1, 8, equalHigh ? "EQH / BSL" : equalLow ? "EQL / SSL" : weakHigh ? "Weak High" : weakLow ? "Weak Low" : "Balanced", text_color=color.white, text_size=textSize)
+
 // ============================================================
 // BACKGROUND + ALERTS
 // ============================================================
@@ -1163,3 +1252,9 @@ alertcondition(bullCHOCH, "Bullish CHOCH", "Bullish change of character confirme
 alertcondition(bearCHOCH, "Bearish CHOCH", "Bearish change of character confirmed")
 alertcondition(bullSweep, "Sell-side Liquidity Sweep", "Sell-side liquidity swept and reclaimed")
 alertcondition(bearSweep, "Buy-side Liquidity Sweep", "Buy-side liquidity swept and rejected")
+alertcondition(bullExecutionReady, "Bullish ICT Execution Stack", "Ordered bullish ICT/SMC execution stack is in an entry zone")
+alertcondition(bearExecutionReady, "Bearish ICT Execution Stack", "Ordered bearish ICT/SMC execution stack is in an entry zone")
+alertcondition(bullSmtCount > 0, "Bullish SMT Divergence", "Bullish SMT divergence detected versus configured reference")
+alertcondition(bearSmtCount > 0, "Bearish SMT Divergence", "Bearish SMT divergence detected versus configured reference")
+alertcondition(bullOteEntry, "Bullish OTE Entry Zone", "Price is in bullish OTE discount zone")
+alertcondition(bearOteEntry, "Bearish OTE Entry Zone", "Price is in bearish OTE premium zone")
