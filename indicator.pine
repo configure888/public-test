@@ -1,0 +1,831 @@
+//@version=6
+indicator("Advanced Pattern Intelligence System v2", overlay=true, max_bars_back=1000, max_lines_count=500, max_labels_count=500, max_boxes_count=200, dynamic_requests=true)
+
+// ============================================================
+// INPUTS
+// ============================================================
+g1 = "Core Detection"
+pivotLen          = input.int(5, "Confirmed Pivot Strength", minval=2, maxval=20, group=g1)
+minSwingATR       = input.float(0.60, "Minimum Swing Size (ATR)", minval=0.10, maxval=5.0, step=0.05, group=g1)
+priceToleranceATR = input.float(0.45, "Pattern Price Tolerance (ATR)", minval=0.10, maxval=2.0, step=0.05, group=g1)
+minTouches        = input.int(2, "Minimum Trendline Touches / Side", minval=2, maxval=5, group=g1)
+maxSwingMemory    = input.int(80, "Swing Memory", minval=20, maxval=200, group=g1)
+
+
+g2 = "Context / Confirmation"
+atrLen            = input.int(14, "ATR Length", minval=5, maxval=100, group=g2)
+volLen            = input.int(20, "Volume Baseline", minval=5, maxval=100, group=g2)
+volumeMultiplier  = input.float(1.20, "Volume Confirmation Multiplier", minval=0.5, maxval=5.0, step=0.05, group=g2)
+displacementATR   = input.float(1.00, "Displacement Body (ATR)", minval=0.25, maxval=5.0, step=0.05, group=g2)
+fvgMemory         = input.int(8, "FVG Context Memory (bars)", minval=1, maxval=50, group=g2)
+sequenceWindow    = input.int(20, "SMC Sequence Window (bars)", minval=5, maxval=100, group=g2)
+
+
+g3 = "Higher Timeframe Context"
+useHTF            = input.bool(true, "Use Confirmed HTF Bias", group=g3)
+htfTf             = input.timeframe("240", "Higher Timeframe", group=g3)
+htfFastLen        = input.int(50, "HTF Fast EMA", minval=5, maxval=300, group=g3)
+htfSlowLen        = input.int(200, "HTF Slow EMA", minval=20, maxval=500, group=g3)
+
+
+g4 = "Pattern Modules"
+detectStructure   = input.bool(true, "BOS / CHOCH", group=g4)
+detectLiquidity   = input.bool(true, "Liquidity Sweeps", group=g4)
+detectFVG         = input.bool(true, "Fair Value Gaps", group=g4)
+detectDoubles     = input.bool(true, "Double Top / Bottom", group=g4)
+detectHS          = input.bool(true, "Head & Shoulders / Inverse", group=g4)
+detectTriangles   = input.bool(true, "Triangles / Broadening", group=g4)
+detectWedges      = input.bool(true, "Rising / Falling Wedges", group=g4)
+detectFlags       = input.bool(true, "Bull / Bear Flags", group=g4)
+detectChannels    = input.bool(true, "Channels / Rectangles", group=g4)
+detectHarmonics   = input.bool(true, "Gartley / Bat / Butterfly / Crab", group=g4)
+detectCandles     = input.bool(true, "Price Action Candles", group=g4)
+detectSequence    = input.bool(true, "SMC Sequence Classifier", group=g4)
+
+
+g5 = "Compression / Continuation"
+compressionLen    = input.int(20, "Compression Window", minval=8, maxval=100, group=g5)
+compressionRatio  = input.float(0.68, "Compression Threshold", minval=0.25, maxval=0.95, step=0.01, group=g5)
+flatSlopeATR      = input.float(0.03, "Flat Slope Threshold (ATR/bar)", minval=0.001, maxval=0.25, step=0.001, group=g5)
+trendSlopeATR     = input.float(0.03, "Directional Slope Threshold (ATR/bar)", minval=0.001, maxval=0.25, step=0.001, group=g5)
+flagLen           = input.int(10, "Flag Consolidation Length", minval=5, maxval=30, group=g5)
+flagPoleLen       = input.int(20, "Flag Pole Length", minval=8, maxval=60, group=g5)
+flagImpulseATR    = input.float(3.0, "Minimum Flag Impulse (ATR)", minval=1.0, maxval=10.0, step=0.25, group=g5)
+
+
+g6 = "Display"
+showTable         = input.bool(true, "Show Pattern Matrix", group=g6)
+showExplanation   = input.bool(true, "Show Explanation Panel", group=g6)
+showPivots        = input.bool(true, "Show Confirmed Pivots", group=g6)
+showSwingLevels   = input.bool(true, "Show Latest Swing S/R", group=g6)
+showTargets       = input.bool(true, "Show Targets", group=g6)
+showFVGZones      = input.bool(true, "Show Latest Active FVG", group=g6)
+showBackground    = input.bool(false, "Directional Background", group=g6)
+maxPatterns       = input.int(6, "Max Matrix Rows", minval=1, maxval=10, group=g6)
+panelTransparency = input.int(82, "Panel Transparency", minval=0, maxval=100, group=g6)
+
+
+g7 = "Panel Position"
+tablePosition     = input.string("top_right", "Pattern Matrix", options=["top_left", "top_center", "top_right", "middle_left", "middle_center", "middle_right", "bottom_left", "bottom_center", "bottom_right"], group=g7)
+explainPosition   = input.string("middle_right", "Explanation Panel", options=["top_left", "top_center", "top_right", "middle_left", "middle_center", "middle_right", "bottom_left", "bottom_center", "bottom_right"], group=g7)
+panelTextSize     = input.string("small", "Panel Text Size", options=["tiny", "small", "normal", "large"], group=g7)
+
+// ============================================================
+// TYPES
+// ============================================================
+type PatternInfo
+    string name
+    string direction
+    float confidence
+    string stage
+    int startBar
+    int endBar
+    float upper
+    float lower
+    float target
+    string reason
+
+// ============================================================
+// HELPERS
+// ============================================================
+f_pos(string p) =>
+    switch p
+        "top_left" => position.top_left
+        "top_center" => position.top_center
+        "top_right" => position.top_right
+        "middle_left" => position.middle_left
+        "middle_center" => position.middle_center
+        "middle_right" => position.middle_right
+        "bottom_left" => position.bottom_left
+        "bottom_center" => position.bottom_center
+        "bottom_right" => position.bottom_right
+        => position.top_right
+
+f_size(string s) =>
+    switch s
+        "tiny" => size.tiny
+        "small" => size.small
+        "large" => size.large
+        => size.normal
+
+f_empty() =>
+    PatternInfo.new("", "neutral", 0.0, "Idle", bar_index, bar_index, na, na, na, "")
+
+f_clamp(float x, float lo, float hi) =>
+    math.max(lo, math.min(hi, x))
+
+f_stage(bool triggered, bool impulseConfirmed) =>
+    triggered ? (impulseConfirmed ? "Confirmed" : "Triggered") : "Forming"
+
+f_direction_color(string direction) =>
+    direction == "bullish" ? color.lime : direction == "bearish" ? color.red : color.yellow
+
+f_score(float base, float geometry01, bool triggered, bool sweep, bool fvg, bool displacement, bool htfAligned, bool volConfirmed) =>
+    float score = base
+    score += 18.0 * f_clamp(geometry01, 0.0, 1.0)
+    score += triggered ? 12.0 : 0.0
+    score += sweep ? 7.0 : 0.0
+    score += fvg ? 6.0 : 0.0
+    score += displacement ? 6.0 : 0.0
+    score += htfAligned ? 5.0 : 0.0
+    score += volConfirmed ? 4.0 : 0.0
+    f_clamp(score, 1.0, 99.0)
+
+f_ratio_near(float value, float target, float tolerance) =>
+    not na(value) and math.abs(value - target) <= tolerance
+
+f_ratio_range(float value, float lo, float hi) =>
+    not na(value) and value >= lo and value <= hi
+
+// Maintains an alternating, significance-filtered swing graph.
+f_add_swing(array<float> prices, array<int> bars, array<int> kinds, float price, int pivotBar, int kind, float minMove, int memory) =>
+    bool accepted = false
+    int n = array.size(prices)
+    if n == 0
+        array.push(prices, price)
+        array.push(bars, pivotBar)
+        array.push(kinds, kind)
+        accepted := true
+    else
+        int lastIndex = n - 1
+        float lastPrice = array.get(prices, lastIndex)
+        int lastBar = array.get(bars, lastIndex)
+        int lastKind = array.get(kinds, lastIndex)
+        if pivotBar >= lastBar
+            if kind == lastKind
+                bool moreExtreme = kind == 1 ? price > lastPrice : price < lastPrice
+                if moreExtreme
+                    array.set(prices, lastIndex, price)
+                    array.set(bars, lastIndex, pivotBar)
+                    accepted := true
+            else if math.abs(price - lastPrice) >= minMove
+                array.push(prices, price)
+                array.push(bars, pivotBar)
+                array.push(kinds, kind)
+                accepted := true
+    while array.size(prices) > memory
+        array.shift(prices)
+        array.shift(bars)
+        array.shift(kinds)
+    accepted
+
+f_nth_type(array<float> prices, array<int> bars, array<int> kinds, int wantedKind, int nth) =>
+    float outPrice = na
+    int outBar = na
+    int seen = 0
+    int n = array.size(kinds)
+    if n > 0
+        for k = 0 to n - 1
+            int idx = n - 1 - k
+            if array.get(kinds, idx) == wantedKind
+                if seen == nth
+                    outPrice := array.get(prices, idx)
+                    outBar := array.get(bars, idx)
+                    break
+                seen += 1
+    [outPrice, outBar]
+
+f_count_recent_kind(array<int> bars, array<int> kinds, int wantedKind, int minBar) =>
+    int count = 0
+    int n = array.size(kinds)
+    if n > 0
+        for i = 0 to n - 1
+            if array.get(kinds, i) == wantedKind and array.get(bars, i) >= minBar
+                count += 1
+    count
+
+f_add_pattern(array<PatternInfo> dest, PatternInfo p) =>
+    if p.name != ""
+        array.push(dest, p)
+
+f_sort_patterns(array<PatternInfo> patterns) =>
+    int n = array.size(patterns)
+    if n > 1
+        for i = 0 to n - 2
+            for j = 0 to n - i - 2
+                PatternInfo a = array.get(patterns, j)
+                PatternInfo b = array.get(patterns, j + 1)
+                if a.confidence < b.confidence
+                    array.set(patterns, j, b)
+                    array.set(patterns, j + 1, a)
+
+// ============================================================
+// BASE SERIES / NON-REPAINTING CONTEXT
+// ============================================================
+atr = ta.atr(atrLen)
+atrSafe = math.max(atr, syminfo.mintick)
+body = math.abs(close - open)
+bodyATR = body / atrSafe
+volBase = ta.sma(volume, volLen)
+volConfirmed = not na(volume) and not na(volBase) and volume > volBase * volumeMultiplier
+bullDisplacement = close > open and bodyATR >= displacementATR
+bearDisplacement = close < open and bodyATR >= displacementATR
+
+bool htfValid = timeframe.in_seconds(htfTf) > timeframe.in_seconds(timeframe.period)
+float htfClose = na
+float htfFast = na
+float htfSlow = na
+if useHTF and htfValid
+    htfClose := request.security(syminfo.tickerid, htfTf, close[1], lookahead=barmerge.lookahead_on)
+    htfFast := request.security(syminfo.tickerid, htfTf, ta.ema(close, htfFastLen)[1], lookahead=barmerge.lookahead_on)
+    htfSlow := request.security(syminfo.tickerid, htfTf, ta.ema(close, htfSlowLen)[1], lookahead=barmerge.lookahead_on)
+
+htfBull = useHTF and htfValid and not na(htfClose) and htfClose > htfFast and htfFast > htfSlow
+htfBear = useHTF and htfValid and not na(htfClose) and htfClose < htfFast and htfFast < htfSlow
+
+// Confirmed pivots. The pivot is only known pivotLen bars after it occurs.
+ph = ta.pivothigh(high, pivotLen, pivotLen)
+pl = ta.pivotlow(low, pivotLen, pivotLen)
+
+var array<float> swingPrices = array.new<float>()
+var array<int> swingBars = array.new<int>()
+var array<int> swingKinds = array.new<int>()  // +1 high, -1 low
+
+if not na(ph)
+    float pivotAtrH = nz(atr[pivotLen], atrSafe)
+    f_add_swing(swingPrices, swingBars, swingKinds, ph, bar_index - pivotLen, 1, pivotAtrH * minSwingATR, maxSwingMemory)
+if not na(pl)
+    float pivotAtrL = nz(atr[pivotLen], atrSafe)
+    f_add_swing(swingPrices, swingBars, swingKinds, pl, bar_index - pivotLen, -1, pivotAtrL * minSwingATR, maxSwingMemory)
+
+[lastHigh, lastHighBar] = f_nth_type(swingPrices, swingBars, swingKinds, 1, 0)
+[prevHigh, prevHighBar] = f_nth_type(swingPrices, swingBars, swingKinds, 1, 1)
+[lastLow, lastLowBar] = f_nth_type(swingPrices, swingBars, swingKinds, -1, 0)
+[prevLow, prevLowBar] = f_nth_type(swingPrices, swingBars, swingKinds, -1, 1)
+
+haveStructure = not na(lastHigh) and not na(prevHigh) and not na(lastLow) and not na(prevLow)
+structBull = haveStructure and lastHigh > prevHigh and lastLow > prevLow
+structBear = haveStructure and lastHigh < prevHigh and lastLow < prevLow
+
+bullBreak = not na(lastHigh) and close > lastHigh and close[1] <= lastHigh
+bearBreak = not na(lastLow) and close < lastLow and close[1] >= lastLow
+bullCHOCH = bullBreak and structBear
+bearCHOCH = bearBreak and structBull
+bullBOS = bullBreak and not structBear
+bearBOS = bearBreak and not structBull
+
+bullSweep = not na(lastLow) and low < lastLow and close > lastLow
+bearSweep = not na(lastHigh) and high > lastHigh and close < lastHigh
+
+// Fair value gaps and latest active zones.
+bullFvgEvent = low > high[2]
+bearFvgEvent = high < low[2]
+
+var float bullFvgTop = na
+var float bullFvgBottom = na
+var int bullFvgBar = na
+var float bearFvgTop = na
+var float bearFvgBottom = na
+var int bearFvgBar = na
+
+if bullFvgEvent
+    bullFvgTop := low
+    bullFvgBottom := high[2]
+    bullFvgBar := bar_index
+if bearFvgEvent
+    bearFvgTop := low[2]
+    bearFvgBottom := high
+    bearFvgBar := bar_index
+
+if not na(bullFvgBottom) and low <= bullFvgBottom
+    bullFvgTop := na
+    bullFvgBottom := na
+    bullFvgBar := na
+if not na(bearFvgTop) and high >= bearFvgTop
+    bearFvgTop := na
+    bearFvgBottom := na
+    bearFvgBar := na
+
+bullFvgAge = nz(ta.barssince(bullFvgEvent), 100000)
+bearFvgAge = nz(ta.barssince(bearFvgEvent), 100000)
+bullFvgRecent = bullFvgAge <= fvgMemory
+bearFvgRecent = bearFvgAge <= fvgMemory
+bullFvgRetrace = not na(bullFvgTop) and not na(bullFvgBar) and bar_index > bullFvgBar and low <= bullFvgTop and high >= bullFvgBottom
+bearFvgRetrace = not na(bearFvgTop) and not na(bearFvgBar) and bar_index > bearFvgBar and high >= bearFvgBottom and low <= bearFvgTop
+
+// Compression state.
+recentRange = ta.highest(high, compressionLen) - ta.lowest(low, compressionLen)
+priorRange = recentRange[compressionLen]
+rangeCompression = not na(priorRange) and priorRange > 0 ? recentRange / priorRange : 1.0
+atrMean = ta.sma(atr, compressionLen)
+priorAtrMean = atrMean[compressionLen]
+atrCompression = not na(priorAtrMean) and priorAtrMean > 0 ? atrMean / priorAtrMean : 1.0
+coilActive = rangeCompression <= compressionRatio and atrCompression < 1.0
+
+// Recent event ages for sequence logic.
+bullSweepAge = nz(ta.barssince(bullSweep), 100000)
+bearSweepAge = nz(ta.barssince(bearSweep), 100000)
+bullChochAge = nz(ta.barssince(bullCHOCH), 100000)
+bearChochAge = nz(ta.barssince(bearCHOCH), 100000)
+bullDispAge = nz(ta.barssince(bullDisplacement), 100000)
+bearDispAge = nz(ta.barssince(bearDisplacement), 100000)
+coilAge = nz(ta.barssince(coilActive), 100000)
+
+// ============================================================
+// DETECTORS
+// ============================================================
+f_detect_double(array<float> prices, array<int> bars, array<int> kinds, bool bullish) =>
+    PatternInfo out = f_empty()
+    int n = array.size(prices)
+    if n >= 3
+        int i0 = n - 3
+        int i1 = n - 2
+        int i2 = n - 1
+        int k0 = array.get(kinds, i0)
+        int k1 = array.get(kinds, i1)
+        int k2 = array.get(kinds, i2)
+        float p0 = array.get(prices, i0)
+        float p1 = array.get(prices, i1)
+        float p2 = array.get(prices, i2)
+        int b0 = array.get(bars, i0)
+        int b2 = array.get(bars, i2)
+        float tol = atrSafe * priceToleranceATR
+        bool sequenceOk = bullish ? (k0 == -1 and k1 == 1 and k2 == -1) : (k0 == 1 and k1 == -1 and k2 == 1)
+        if sequenceOk
+            float equalDiff = math.abs(p2 - p0)
+            bool geometryOk = equalDiff <= tol
+            if geometryOk
+                float geometry = 1.0 - equalDiff / math.max(tol, syminfo.mintick)
+                float neckline = p1
+                bool triggered = bullish ? close > neckline : close < neckline
+                bool swept = bullish ? p2 < p0 : p2 > p0
+                bool fvgOk = bullish ? bullFvgRecent : bearFvgRecent
+                bool dispOk = bullish ? bullDisplacement : bearDisplacement
+                bool htfOk = bullish ? htfBull : htfBear
+                float score = f_score(43.0, geometry, triggered, swept, fvgOk, dispOk, htfOk, volConfirmed)
+                float extreme = (p0 + p2) / 2.0
+                float target = bullish ? neckline + (neckline - extreme) : neckline - (extreme - neckline)
+                string stage = f_stage(triggered, dispOk or fvgOk)
+                string reason = "Swing equality " + str.tostring(geometry * 100.0, "#") + "%\n" +
+                    (swept ? "Liquidity sweep: yes\n" : "Liquidity sweep: no\n") +
+                    (triggered ? "Neckline: broken\n" : "Neckline: intact\n") +
+                    (fvgOk ? "FVG context: yes" : "FVG context: no")
+                out := PatternInfo.new(bullish ? "Double Bottom" : "Double Top", bullish ? "bullish" : "bearish", score, stage, b0, bar_index, bullish ? neckline : extreme, bullish ? extreme : neckline, target, reason)
+    out
+
+f_detect_hs(array<float> prices, array<int> bars, array<int> kinds, bool inverse) =>
+    PatternInfo out = f_empty()
+    int n = array.size(prices)
+    if n >= 5
+        int s = n - 5
+        int k0 = array.get(kinds, s)
+        int k1 = array.get(kinds, s + 1)
+        int k2 = array.get(kinds, s + 2)
+        int k3 = array.get(kinds, s + 3)
+        int k4 = array.get(kinds, s + 4)
+        float p0 = array.get(prices, s)
+        float p1 = array.get(prices, s + 1)
+        float p2 = array.get(prices, s + 2)
+        float p3 = array.get(prices, s + 3)
+        float p4 = array.get(prices, s + 4)
+        int b0 = array.get(bars, s)
+        bool sequenceOk = inverse ? (k0 == -1 and k1 == 1 and k2 == -1 and k3 == 1 and k4 == -1) : (k0 == 1 and k1 == -1 and k2 == 1 and k3 == -1 and k4 == 1)
+        if sequenceOk
+            float tol = atrSafe * priceToleranceATR * 1.5
+            float shoulderDiff = math.abs(p0 - p4)
+            bool shouldersOk = shoulderDiff <= tol
+            bool headOk = inverse ? (p2 < p0 - atrSafe * 0.35 and p2 < p4 - atrSafe * 0.35) : (p2 > p0 + atrSafe * 0.35 and p2 > p4 + atrSafe * 0.35)
+            if shouldersOk and headOk
+                float neckline = (p1 + p3) / 2.0
+                bool triggered = inverse ? close > neckline : close < neckline
+                float geometry = 1.0 - shoulderDiff / math.max(tol, syminfo.mintick)
+                bool fvgOk = inverse ? bullFvgRecent : bearFvgRecent
+                bool dispOk = inverse ? bullDisplacement : bearDisplacement
+                bool htfOk = inverse ? htfBull : htfBear
+                float score = f_score(48.0, geometry, triggered, false, fvgOk, dispOk, htfOk, volConfirmed)
+                float target = inverse ? neckline + (neckline - p2) : neckline - (p2 - neckline)
+                string reason = "Shoulder symmetry " + str.tostring(geometry * 100.0, "#") + "%\nHead displacement: valid\n" + (triggered ? "Neckline: broken" : "Neckline: intact")
+                out := PatternInfo.new(inverse ? "Inverse Head & Shoulders" : "Head & Shoulders", inverse ? "bullish" : "bearish", score, f_stage(triggered, dispOk or fvgOk), b0, bar_index, inverse ? neckline : p2, inverse ? p2 : neckline, target, reason)
+    out
+
+f_detect_triangle(array<float> prices, array<int> bars, array<int> kinds) =>
+    PatternInfo out = f_empty()
+    [h0, hb0] = f_nth_type(prices, bars, kinds, 1, 0)
+    [h1, hb1] = f_nth_type(prices, bars, kinds, 1, 1)
+    [l0, lb0] = f_nth_type(prices, bars, kinds, -1, 0)
+    [l1, lb1] = f_nth_type(prices, bars, kinds, -1, 1)
+    bool ready = not na(h0) and not na(h1) and not na(l0) and not na(l1) and hb0 != hb1 and lb0 != lb1
+    if ready
+        int highTouches = f_count_recent_kind(bars, kinds, 1, bar_index - compressionLen * 3)
+        int lowTouches = f_count_recent_kind(bars, kinds, -1, bar_index - compressionLen * 3)
+        float upperSlope = (h0 - h1) / math.max(1.0, float(hb0 - hb1))
+        float lowerSlope = (l0 - l1) / math.max(1.0, float(lb0 - lb1))
+        float upperN = upperSlope / atrSafe
+        float lowerN = lowerSlope / atrSafe
+        bool touchOk = highTouches >= minTouches and lowTouches >= minTouches
+        bool compressed = rangeCompression <= compressionRatio
+        float geo = f_clamp(1.0 - rangeCompression, 0.0, 1.0)
+        string nm = ""
+        string dir = "neutral"
+        if touchOk and compressed
+            if math.abs(upperN) <= flatSlopeATR and lowerN >= trendSlopeATR
+                nm := "Ascending Triangle"
+                dir := "bullish"
+            else if upperN <= -trendSlopeATR and math.abs(lowerN) <= flatSlopeATR
+                nm := "Descending Triangle"
+                dir := "bearish"
+            else if upperN <= -trendSlopeATR and lowerN >= trendSlopeATR
+                nm := "Symmetrical Triangle"
+                dir := "neutral"
+        if nm == "" and touchOk and upperN >= trendSlopeATR and lowerN <= -trendSlopeATR and rangeCompression > 1.0
+            nm := "Broadening Formation"
+            dir := "neutral"
+            geo := f_clamp(rangeCompression - 1.0, 0.0, 1.0)
+        if nm != ""
+            bool bullDir = dir == "bullish"
+            bool bearDir = dir == "bearish"
+            bool triggered = bullDir ? close > h0 : bearDir ? close < l0 : (close > h0 or close < l0)
+            bool dispOk = bullDir ? bullDisplacement : bearDir ? bearDisplacement : (bullDisplacement or bearDisplacement)
+            bool fvgOk = bullDir ? bullFvgRecent : bearDir ? bearFvgRecent : (bullFvgRecent or bearFvgRecent)
+            bool htfOk = bullDir ? htfBull : bearDir ? htfBear : false
+            float score = f_score(40.0, geo, triggered, false, fvgOk, dispOk, htfOk, volConfirmed)
+            string reason = "Upper slope " + str.tostring(upperN, "#.###") + " ATR/bar\nLower slope " + str.tostring(lowerN, "#.###") + " ATR/bar\nRange ratio " + str.tostring(rangeCompression, "#.##")
+            float target = bullDir ? h0 + recentRange : bearDir ? l0 - recentRange : na
+            out := PatternInfo.new(nm, dir, score, f_stage(triggered, dispOk or fvgOk), math.min(hb1, lb1), bar_index, h0, l0, target, reason)
+    out
+
+f_detect_wedge(array<float> prices, array<int> bars, array<int> kinds) =>
+    PatternInfo out = f_empty()
+    [h0, hb0] = f_nth_type(prices, bars, kinds, 1, 0)
+    [h1, hb1] = f_nth_type(prices, bars, kinds, 1, 1)
+    [l0, lb0] = f_nth_type(prices, bars, kinds, -1, 0)
+    [l1, lb1] = f_nth_type(prices, bars, kinds, -1, 1)
+    bool ready = not na(h0) and not na(h1) and not na(l0) and not na(l1) and hb0 != hb1 and lb0 != lb1
+    if ready and rangeCompression <= compressionRatio
+        float upperN = ((h0 - h1) / math.max(1.0, float(hb0 - hb1))) / atrSafe
+        float lowerN = ((l0 - l1) / math.max(1.0, float(lb0 - lb1))) / atrSafe
+        bool rising = upperN > trendSlopeATR and lowerN > trendSlopeATR and lowerN > upperN
+        bool falling = upperN < -trendSlopeATR and lowerN < -trendSlopeATR and upperN < lowerN
+        if rising or falling
+            bool bullish = falling
+            float slopeSpread = math.abs(upperN - lowerN)
+            float geo = f_clamp(slopeSpread / 0.20, 0.0, 1.0)
+            bool triggered = bullish ? close > h0 : close < l0
+            bool fvgOk = bullish ? bullFvgRecent : bearFvgRecent
+            bool dispOk = bullish ? bullDisplacement : bearDisplacement
+            bool htfOk = bullish ? htfBull : htfBear
+            float score = f_score(42.0, geo, triggered, false, fvgOk, dispOk, htfOk, volConfirmed)
+            float target = bullish ? h0 + recentRange : l0 - recentRange
+            string reason = "Converging same-direction boundaries\nUpper " + str.tostring(upperN, "#.###") + " ATR/bar\nLower " + str.tostring(lowerN, "#.###") + " ATR/bar"
+            out := PatternInfo.new(bullish ? "Falling Wedge" : "Rising Wedge", bullish ? "bullish" : "bearish", score, f_stage(triggered, dispOk or fvgOk), math.min(hb1, lb1), bar_index, h0, l0, target, reason)
+    out
+
+f_detect_flag(bool bullish) =>
+    PatternInfo out = f_empty()
+    int totalNeed = flagLen + flagPoleLen + 2
+    if bar_index > totalNeed
+        float poleStart = close[flagLen + flagPoleLen]
+        float poleEnd = close[flagLen]
+        float impulse = poleEnd - poleStart
+        float impulseAbs = math.abs(impulse)
+        float poleAtr = nz(ta.sma(atr, flagPoleLen)[flagLen], atrSafe)
+        float recentSlopeTotal = ta.linreg(close, flagLen, 0) - ta.linreg(close, flagLen, flagLen - 1)
+        float flagRange = ta.highest(high, flagLen) - ta.lowest(low, flagLen)
+        float poleRange = (ta.highest(high, flagPoleLen)[flagLen] - ta.lowest(low, flagPoleLen)[flagLen])
+        bool impulseOk = impulseAbs >= poleAtr * flagImpulseATR
+        bool directionOk = bullish ? impulse > 0 : impulse < 0
+        bool counterSlope = bullish ? recentSlopeTotal < 0 : recentSlopeTotal > 0
+        bool controlled = math.abs(recentSlopeTotal) <= impulseAbs * 0.45 and flagRange <= poleRange * 0.65
+        if impulseOk and directionOk and counterSlope and controlled
+            float flagHigh = ta.highest(high, flagLen)
+            float flagLow = ta.lowest(low, flagLen)
+            bool triggered = bullish ? close > flagHigh[1] : close < flagLow[1]
+            bool fvgOk = bullish ? bullFvgRecent : bearFvgRecent
+            bool dispOk = bullish ? bullDisplacement : bearDisplacement
+            bool htfOk = bullish ? htfBull : htfBear
+            float geometry = f_clamp(1.0 - flagRange / math.max(poleRange, syminfo.mintick), 0.0, 1.0)
+            float score = f_score(41.0, geometry, triggered, false, fvgOk, dispOk, htfOk, volConfirmed)
+            float target = bullish ? flagHigh + impulseAbs : flagLow - impulseAbs
+            string reason = "Impulse " + str.tostring(impulseAbs / poleAtr, "#.1") + " ATR\nCountertrend consolidation\nFlag/pole range " + str.tostring(flagRange / math.max(poleRange, syminfo.mintick), "#.##")
+            out := PatternInfo.new(bullish ? "Bull Flag" : "Bear Flag", bullish ? "bullish" : "bearish", score, f_stage(triggered, dispOk or fvgOk), bar_index - flagLen - flagPoleLen, bar_index, flagHigh, flagLow, target, reason)
+    out
+
+f_detect_channel(array<float> prices, array<int> bars, array<int> kinds) =>
+    PatternInfo out = f_empty()
+    [h0, hb0] = f_nth_type(prices, bars, kinds, 1, 0)
+    [h1, hb1] = f_nth_type(prices, bars, kinds, 1, 1)
+    [l0, lb0] = f_nth_type(prices, bars, kinds, -1, 0)
+    [l1, lb1] = f_nth_type(prices, bars, kinds, -1, 1)
+    bool ready = not na(h0) and not na(h1) and not na(l0) and not na(l1) and hb0 != hb1 and lb0 != lb1
+    if ready
+        float upperN = ((h0 - h1) / math.max(1.0, float(hb0 - hb1))) / atrSafe
+        float lowerN = ((l0 - l1) / math.max(1.0, float(lb0 - lb1))) / atrSafe
+        float slopeDiff = math.abs(upperN - lowerN)
+        bool parallel = slopeDiff <= flatSlopeATR * 1.5
+        if parallel
+            string nm = ""
+            string dir = "neutral"
+            if math.abs(upperN) <= flatSlopeATR and math.abs(lowerN) <= flatSlopeATR
+                nm := "Rectangle / Range"
+            else if upperN > trendSlopeATR and lowerN > trendSlopeATR
+                nm := "Ascending Channel"
+                dir := "bullish"
+            else if upperN < -trendSlopeATR and lowerN < -trendSlopeATR
+                nm := "Descending Channel"
+                dir := "bearish"
+            if nm != ""
+                float geometry = 1.0 - f_clamp(slopeDiff / math.max(flatSlopeATR * 1.5, 0.001), 0.0, 1.0)
+                bool triggered = close > h0 or close < l0
+                bool dispOk = bullDisplacement or bearDisplacement
+                float score = f_score(35.0, geometry, triggered, false, bullFvgRecent or bearFvgRecent, dispOk, dir == "bullish" ? htfBull : dir == "bearish" ? htfBear : false, volConfirmed)
+                out := PatternInfo.new(nm, dir, score, triggered ? "Triggered" : "Active", math.min(hb1, lb1), bar_index, h0, l0, na, "Parallel swing boundaries\nSlope spread " + str.tostring(slopeDiff, "#.###") + " ATR/bar")
+    out
+
+f_detect_harmonic(array<float> prices, array<int> bars, array<int> kinds) =>
+    PatternInfo out = f_empty()
+    int n = array.size(prices)
+    if n >= 5
+        int s = n - 5
+        int k0 = array.get(kinds, s)
+        int k1 = array.get(kinds, s + 1)
+        int k2 = array.get(kinds, s + 2)
+        int k3 = array.get(kinds, s + 3)
+        int k4 = array.get(kinds, s + 4)
+        bool bullSeq = k0 == -1 and k1 == 1 and k2 == -1 and k3 == 1 and k4 == -1
+        bool bearSeq = k0 == 1 and k1 == -1 and k2 == 1 and k3 == -1 and k4 == 1
+        if bullSeq or bearSeq
+            float X = array.get(prices, s)
+            float A = array.get(prices, s + 1)
+            float B = array.get(prices, s + 2)
+            float C = array.get(prices, s + 3)
+            float D = array.get(prices, s + 4)
+            float XA = math.abs(A - X)
+            float AB = math.abs(B - A)
+            float BC = math.abs(C - B)
+            float CD = math.abs(D - C)
+            if XA > syminfo.mintick and AB > syminfo.mintick and BC > syminfo.mintick
+                float abXa = AB / XA
+                float bcAb = BC / AB
+                float cdBc = CD / BC
+                float adXa = math.abs(D - A) / XA
+                string nm = ""
+                float geometry = 0.0
+                bool gartley = f_ratio_near(abXa, 0.618, 0.08) and f_ratio_range(bcAb, 0.382, 0.886) and f_ratio_range(cdBc, 1.13, 1.75) and f_ratio_near(adXa, 0.786, 0.10)
+                bool bat = f_ratio_range(abXa, 0.382, 0.55) and f_ratio_range(bcAb, 0.382, 0.886) and f_ratio_range(cdBc, 1.50, 2.75) and f_ratio_near(adXa, 0.886, 0.10)
+                bool butterfly = f_ratio_near(abXa, 0.786, 0.08) and f_ratio_range(bcAb, 0.382, 0.886) and f_ratio_range(cdBc, 1.50, 2.75) and f_ratio_range(adXa, 1.20, 1.70)
+                bool crab = f_ratio_range(abXa, 0.382, 0.65) and f_ratio_range(bcAb, 0.382, 0.886) and f_ratio_range(cdBc, 2.10, 3.80) and f_ratio_near(adXa, 1.618, 0.18)
+                if gartley
+                    nm := "Gartley"
+                    geometry := 0.90
+                else if bat
+                    nm := "Bat"
+                    geometry := 0.87
+                else if butterfly
+                    nm := "Butterfly"
+                    geometry := 0.85
+                else if crab
+                    nm := "Crab"
+                    geometry := 0.84
+                if nm != ""
+                    bool bullish = bullSeq
+                    bool reaction = bullish ? close > D : close < D
+                    bool fvgOk = bullish ? bullFvgRecent : bearFvgRecent
+                    bool dispOk = bullish ? bullDisplacement : bearDisplacement
+                    bool htfOk = bullish ? htfBull : htfBear
+                    float score = f_score(46.0, geometry, reaction, false, fvgOk, dispOk, htfOk, volConfirmed)
+                    string reason = "AB/XA " + str.tostring(abXa, "#.###") + "\nBC/AB " + str.tostring(bcAb, "#.###") + "\nCD/BC " + str.tostring(cdBc, "#.###") + "\nAD/XA " + str.tostring(adXa, "#.###")
+                    out := PatternInfo.new(nm, bullish ? "bullish" : "bearish", score, reaction ? "Triggered" : "PRZ", array.get(bars, s), bar_index, math.max(C, D), math.min(C, D), na, reason)
+    out
+
+f_detect_candle() =>
+    PatternInfo out = f_empty()
+    float rng = math.max(high - low, syminfo.mintick)
+    float upperWick = high - math.max(open, close)
+    float lowerWick = math.min(open, close) - low
+    float bodyPct = body / rng
+    bool bullEngulf = close > open and close[1] < open[1] and close >= open[1] and open <= close[1]
+    bool bearEngulf = close < open and close[1] > open[1] and open >= close[1] and close <= open[1]
+    bool bullPin = lowerWick >= body * 2.0 and upperWick <= math.max(body, syminfo.mintick) * 0.75 and close > low + rng * 0.60
+    bool bearPin = upperWick >= body * 2.0 and lowerWick <= math.max(body, syminfo.mintick) * 0.75 and close < high - rng * 0.60
+    bool inside = high < high[1] and low > low[1]
+    bool outside = high > high[1] and low < low[1]
+    bool doji = bodyPct <= 0.10
+    if bullEngulf or bearEngulf
+        bool bullish = bullEngulf
+        float geo = f_clamp(body / math.max(math.abs(close[1] - open[1]), syminfo.mintick) / 2.0, 0.0, 1.0)
+        out := PatternInfo.new(bullish ? "Bullish Engulfing" : "Bearish Engulfing", bullish ? "bullish" : "bearish", f_score(40.0, geo, true, bullish ? bullSweep : bearSweep, bullish ? bullFvgRecent : bearFvgRecent, bullish ? bullDisplacement : bearDisplacement, bullish ? htfBull : htfBear, volConfirmed), "Confirmed", bar_index - 1, bar_index, high, low, na, "Real-body engulfing\nContext-adjusted score")
+    else if bullPin or bearPin
+        bool bullish = bullPin
+        float wickRatio = bullish ? lowerWick / math.max(body, syminfo.mintick) : upperWick / math.max(body, syminfo.mintick)
+        float geo = f_clamp((wickRatio - 2.0) / 3.0, 0.0, 1.0)
+        out := PatternInfo.new(bullish ? "Bullish Pin Bar" : "Bearish Pin Bar", bullish ? "bullish" : "bearish", f_score(38.0, geo, true, bullish ? bullSweep : bearSweep, bullish ? bullFvgRecent : bearFvgRecent, bullish ? bullDisplacement : bearDisplacement, bullish ? htfBull : htfBear, volConfirmed), "Confirmed", bar_index, bar_index, high, low, na, "Wick/body " + str.tostring(wickRatio, "#.1") + "x\nClose location confirms rejection")
+    else if inside
+        out := PatternInfo.new("Inside Bar", "neutral", 48.0, "Compression", bar_index - 1, bar_index, high[1], low[1], na, "Current range contained by prior bar")
+    else if outside
+        out := PatternInfo.new("Outside Bar", close >= open ? "bullish" : "bearish", 52.0, "Expansion", bar_index - 1, bar_index, high, low, na, "Current bar exceeds both prior extremes")
+    else if doji
+        out := PatternInfo.new("Doji", "neutral", 42.0, "Indecision", bar_index, bar_index, high, low, na, "Body <= 10% of candle range")
+    out
+
+f_detect_sequence(bool bullish) =>
+    PatternInfo out = f_empty()
+    bool c1 = coilAge <= sequenceWindow
+    bool c2 = bullish ? bullSweepAge <= sequenceWindow : bearSweepAge <= sequenceWindow
+    bool c3 = bullish ? bullChochAge <= sequenceWindow : bearChochAge <= sequenceWindow
+    bool c4 = bullish ? bullDispAge <= sequenceWindow : bearDispAge <= sequenceWindow
+    bool c5 = bullish ? bullFvgAge <= sequenceWindow : bearFvgAge <= sequenceWindow
+    bool c6 = bullish ? bullFvgRetrace : bearFvgRetrace
+    int components = (c1 ? 1 : 0) + (c2 ? 1 : 0) + (c3 ? 1 : 0) + (c4 ? 1 : 0) + (c5 ? 1 : 0)
+    if components >= 3
+        float score = 20.0 + components * 13.0 + (c6 ? 10.0 : 0.0) + ((bullish ? htfBull : htfBear) ? 5.0 : 0.0)
+        score := f_clamp(score, 1.0, 99.0)
+        string stage = c6 and c3 and c4 ? "Entry Zone" : components >= 5 ? "Confirmed" : "Developing"
+        string reason = "Compression " + (c1 ? "Y" : "N") + " | Sweep " + (c2 ? "Y" : "N") + "\nCHOCH " + (c3 ? "Y" : "N") + " | Displacement " + (c4 ? "Y" : "N") + "\nFVG " + (c5 ? "Y" : "N") + " | Retrace " + (c6 ? "Y" : "N")
+        float upper = bullish ? bullFvgTop : bearFvgTop
+        float lower = bullish ? bullFvgBottom : bearFvgBottom
+        out := PatternInfo.new(bullish ? "Bullish SMC Sequence" : "Bearish SMC Sequence", bullish ? "bullish" : "bearish", score, stage, bar_index - sequenceWindow, bar_index, upper, lower, na, reason)
+    out
+
+// ============================================================
+// MAIN CLASSIFICATION
+// ============================================================
+var array<PatternInfo> patterns = array.new<PatternInfo>()
+array.clear(patterns)
+
+if detectDoubles
+    f_add_pattern(patterns, f_detect_double(swingPrices, swingBars, swingKinds, true))
+    f_add_pattern(patterns, f_detect_double(swingPrices, swingBars, swingKinds, false))
+if detectHS
+    f_add_pattern(patterns, f_detect_hs(swingPrices, swingBars, swingKinds, false))
+    f_add_pattern(patterns, f_detect_hs(swingPrices, swingBars, swingKinds, true))
+if detectTriangles
+    f_add_pattern(patterns, f_detect_triangle(swingPrices, swingBars, swingKinds))
+if detectWedges
+    f_add_pattern(patterns, f_detect_wedge(swingPrices, swingBars, swingKinds))
+if detectFlags
+    f_add_pattern(patterns, f_detect_flag(true))
+    f_add_pattern(patterns, f_detect_flag(false))
+if detectChannels
+    f_add_pattern(patterns, f_detect_channel(swingPrices, swingBars, swingKinds))
+if detectHarmonics
+    f_add_pattern(patterns, f_detect_harmonic(swingPrices, swingBars, swingKinds))
+if detectCandles
+    f_add_pattern(patterns, f_detect_candle())
+
+if detectLiquidity and bullSweep
+    float sc = f_score(52.0, 0.80, true, true, bullFvgRecent, bullDisplacement, htfBull, volConfirmed)
+    f_add_pattern(patterns, PatternInfo.new("Sell-side Liquidity Sweep", "bullish", sc, "Confirmed", nz(lastLowBar, bar_index), bar_index, lastLow, low, na, "Low traded below confirmed swing low\nClose reclaimed the liquidity level"))
+if detectLiquidity and bearSweep
+    float sc = f_score(52.0, 0.80, true, true, bearFvgRecent, bearDisplacement, htfBear, volConfirmed)
+    f_add_pattern(patterns, PatternInfo.new("Buy-side Liquidity Sweep", "bearish", sc, "Confirmed", nz(lastHighBar, bar_index), bar_index, high, lastHigh, na, "High traded above confirmed swing high\nClose rejected back below the level"))
+
+if detectStructure and bullBreak
+    bool isChoch = bullCHOCH
+    float sc = f_score(isChoch ? 55.0 : 48.0, 0.80, true, bullSweepAge <= sequenceWindow, bullFvgRecent, bullDisplacement, htfBull, volConfirmed)
+    f_add_pattern(patterns, PatternInfo.new(isChoch ? "Bullish CHOCH" : "Bullish BOS", "bullish", sc, bullDisplacement ? "Confirmed" : "Triggered", nz(lastHighBar, bar_index), bar_index, close, lastHigh, na, "Close broke confirmed swing high\nPrior structure: " + (structBear ? "bearish" : structBull ? "bullish" : "mixed")))
+if detectStructure and bearBreak
+    bool isChoch = bearCHOCH
+    float sc = f_score(isChoch ? 55.0 : 48.0, 0.80, true, bearSweepAge <= sequenceWindow, bearFvgRecent, bearDisplacement, htfBear, volConfirmed)
+    f_add_pattern(patterns, PatternInfo.new(isChoch ? "Bearish CHOCH" : "Bearish BOS", "bearish", sc, bearDisplacement ? "Confirmed" : "Triggered", nz(lastLowBar, bar_index), bar_index, lastLow, close, na, "Close broke confirmed swing low\nPrior structure: " + (structBull ? "bullish" : structBear ? "bearish" : "mixed")))
+
+if detectFVG and bullFvgEvent
+    float sc = f_score(44.0, f_clamp((low - high[2]) / atrSafe, 0.0, 1.0), true, bullSweepAge <= sequenceWindow, true, bullDisplacement, htfBull, volConfirmed)
+    f_add_pattern(patterns, PatternInfo.new("Bullish FVG", "bullish", sc, "Open", bar_index - 2, bar_index, low, high[2], na, "Three-candle imbalance\nGap size " + str.tostring((low - high[2]) / atrSafe, "#.2") + " ATR"))
+if detectFVG and bearFvgEvent
+    float sc = f_score(44.0, f_clamp((low[2] - high) / atrSafe, 0.0, 1.0), true, bearSweepAge <= sequenceWindow, true, bearDisplacement, htfBear, volConfirmed)
+    f_add_pattern(patterns, PatternInfo.new("Bearish FVG", "bearish", sc, "Open", bar_index - 2, bar_index, low[2], high, na, "Three-candle imbalance\nGap size " + str.tostring((low[2] - high) / atrSafe, "#.2") + " ATR"))
+
+if coilActive
+    float maturity = f_clamp((compressionRatio - rangeCompression) / math.max(compressionRatio, 0.01) + 0.5, 0.0, 1.0)
+    float sc = 45.0 + maturity * 30.0
+    f_add_pattern(patterns, PatternInfo.new("HTF/Local Coil", "neutral", sc, rangeCompression < compressionRatio * 0.80 ? "Mature" : "Forming", bar_index - compressionLen, bar_index, ta.highest(high, compressionLen), ta.lowest(low, compressionLen), na, "Range ratio " + str.tostring(rangeCompression, "#.##") + "\nATR ratio " + str.tostring(atrCompression, "#.##") + "\nExpansion risk rising"))
+
+if detectSequence
+    f_add_pattern(patterns, f_detect_sequence(true))
+    f_add_pattern(patterns, f_detect_sequence(false))
+
+f_sort_patterns(patterns)
+
+// ============================================================
+// VISUALS
+// ============================================================
+plotshape(showPivots ? ph : na, title="Pivot High", style=shape.circle, location=location.absolute, color=color.new(color.red, 10), size=size.tiny, offset=-pivotLen)
+plotshape(showPivots ? pl : na, title="Pivot Low", style=shape.circle, location=location.absolute, color=color.new(color.lime, 10), size=size.tiny, offset=-pivotLen)
+
+plot(showSwingLevels ? lastHigh : na, "Latest Swing Resistance", color=color.new(color.red, 70), linewidth=1, style=plot.style_stepline)
+plot(showSwingLevels ? lastLow : na, "Latest Swing Support", color=color.new(color.lime, 70), linewidth=1, style=plot.style_stepline)
+
+bullFvgTopPlot = plot(showFVGZones ? bullFvgTop : na, "Bull FVG Top", color=color.new(color.lime, 80), style=plot.style_linebr)
+bullFvgBotPlot = plot(showFVGZones ? bullFvgBottom : na, "Bull FVG Bottom", color=color.new(color.lime, 80), style=plot.style_linebr)
+fill(bullFvgTopPlot, bullFvgBotPlot, color=color.new(color.lime, 92))
+bearFvgTopPlot = plot(showFVGZones ? bearFvgTop : na, "Bear FVG Top", color=color.new(color.red, 80), style=plot.style_linebr)
+bearFvgBotPlot = plot(showFVGZones ? bearFvgBottom : na, "Bear FVG Bottom", color=color.new(color.red, 80), style=plot.style_linebr)
+fill(bearFvgTopPlot, bearFvgBotPlot, color=color.new(color.red, 92))
+
+var array<line> drawLines = array.new<line>()
+var array<label> drawLabels = array.new<label>()
+
+if barstate.islast
+    if array.size(drawLines) > 0
+        for i = 0 to array.size(drawLines) - 1
+            line.delete(array.get(drawLines, i))
+        array.clear(drawLines)
+    if array.size(drawLabels) > 0
+        for i = 0 to array.size(drawLabels) - 1
+            label.delete(array.get(drawLabels, i))
+        array.clear(drawLabels)
+
+    int count = math.min(array.size(patterns), maxPatterns)
+    if count > 0
+        for i = 0 to count - 1
+            PatternInfo p = array.get(patterns, i)
+            color c = color.new(f_direction_color(p.direction), 12)
+            float y = high + atrSafe * (1.0 + i * 0.65)
+            label lb = label.new(bar_index + 2, y, p.name + "  " + str.tostring(p.confidence, "#") + "%\n" + p.stage, xloc=xloc.bar_index, color=c, textcolor=color.white, style=label.style_label_left, size=size.small)
+            array.push(drawLabels, lb)
+            if showTargets and not na(p.target)
+                line ln = line.new(bar_index, p.target, bar_index + 25, p.target, xloc=xloc.bar_index, extend=extend.none, color=c, style=line.style_dashed, width=2)
+                array.push(drawLines, ln)
+                label tl = label.new(bar_index + 25, p.target, "Target " + str.tostring(p.target, format.mintick), xloc=xloc.bar_index, color=color.new(c, 20), textcolor=color.white, style=label.style_label_left, size=size.tiny)
+                array.push(drawLabels, tl)
+
+// ============================================================
+// TABLES
+// ============================================================
+var table matrix = na
+var table explain = na
+
+if barstate.isfirst
+    if showTable
+        matrix := table.new(f_pos(tablePosition), 4, maxPatterns + 1, bgcolor=color.new(color.black, panelTransparency), border_width=1)
+    if showExplanation
+        explain := table.new(f_pos(explainPosition), 2, maxPatterns + 1, bgcolor=color.new(color.black, panelTransparency), border_width=1)
+
+if barstate.islast
+    string textSize = f_size(panelTextSize)
+    if showTable and not na(matrix)
+        table.cell(matrix, 0, 0, "Pattern", bgcolor=color.new(color.blue, 25), text_color=color.white, text_size=textSize)
+        table.cell(matrix, 1, 0, "Dir", bgcolor=color.new(color.blue, 25), text_color=color.white, text_size=textSize)
+        table.cell(matrix, 2, 0, "Score", bgcolor=color.new(color.blue, 25), text_color=color.white, text_size=textSize)
+        table.cell(matrix, 3, 0, "State", bgcolor=color.new(color.blue, 25), text_color=color.white, text_size=textSize)
+        for r = 1 to maxPatterns
+            table.cell(matrix, 0, r, "", text_size=textSize)
+            table.cell(matrix, 1, r, "", text_size=textSize)
+            table.cell(matrix, 2, r, "", text_size=textSize)
+            table.cell(matrix, 3, r, "", text_size=textSize)
+        int count = math.min(array.size(patterns), maxPatterns)
+        if count > 0
+            for i = 0 to count - 1
+                PatternInfo p = array.get(patterns, i)
+                color dc = f_direction_color(p.direction)
+                color sc = p.confidence >= 80 ? color.lime : p.confidence >= 65 ? color.yellow : color.silver
+                table.cell(matrix, 0, i + 1, p.name, text_color=color.white, text_size=textSize)
+                table.cell(matrix, 1, i + 1, p.direction, text_color=dc, text_size=textSize)
+                table.cell(matrix, 2, i + 1, str.tostring(p.confidence, "#") + "%", text_color=sc, text_size=textSize)
+                table.cell(matrix, 3, i + 1, p.stage, text_color=color.aqua, text_size=textSize)
+        else
+            table.cell(matrix, 0, 1, "Scanning", text_color=color.gray, text_size=textSize)
+            table.cell(matrix, 3, 1, "Idle", text_color=color.gray, text_size=textSize)
+
+    if showExplanation and not na(explain)
+        table.cell(explain, 0, 0, "Detection", bgcolor=color.new(color.purple, 25), text_color=color.white, text_size=textSize)
+        table.cell(explain, 1, 0, "Evidence", bgcolor=color.new(color.purple, 25), text_color=color.white, text_size=textSize)
+        for r = 1 to maxPatterns
+            table.cell(explain, 0, r, "", text_size=textSize)
+            table.cell(explain, 1, r, "", text_size=textSize)
+        int count = math.min(array.size(patterns), maxPatterns)
+        if count > 0
+            for i = 0 to count - 1
+                PatternInfo p = array.get(patterns, i)
+                table.cell(explain, 0, i + 1, p.name, bgcolor=color.new(f_direction_color(p.direction), 75), text_color=color.white, text_size=textSize)
+                table.cell(explain, 1, i + 1, p.reason, text_color=color.white, text_size=textSize)
+        else
+            table.cell(explain, 0, 1, "No pattern", text_color=color.gray, text_size=textSize)
+            table.cell(explain, 1, 1, "Waiting for confirmed structure", text_color=color.gray, text_size=textSize)
+
+// ============================================================
+// BACKGROUND + ALERTS
+// ============================================================
+string topDir = ""
+string topName = ""
+string topStage = ""
+float topScore = na
+bool anyPattern = array.size(patterns) > 0
+if anyPattern
+    PatternInfo top = array.get(patterns, 0)
+    topDir := top.direction
+    topName := top.name
+    topStage := top.stage
+    topScore := top.confidence
+
+color bg = na
+if showBackground and anyPattern
+    bg := topDir == "bullish" ? color.new(color.green, 94) : topDir == "bearish" ? color.new(color.red, 94) : color.new(color.yellow, 96)
+bgcolor(bg)
+
+var string lastAlertKey = ""
+if barstate.isconfirmed
+    if anyPattern
+        string currentKey = topName + "|" + topStage + "|" + topDir
+        if currentKey != lastAlertKey
+            alert("Pattern Intelligence: " + topName + " [" + topDir + "] " + topStage + " | Score " + str.tostring(topScore, "#") + "%", alert.freq_once_per_bar_close)
+            lastAlertKey := currentKey
+    else
+        lastAlertKey := ""
+
+alertcondition(anyPattern and topDir == "bullish", "Top Pattern Bullish", "Top-ranked pattern is bullish")
+alertcondition(anyPattern and topDir == "bearish", "Top Pattern Bearish", "Top-ranked pattern is bearish")
+alertcondition(bullCHOCH, "Bullish CHOCH", "Bullish change of character confirmed")
+alertcondition(bearCHOCH, "Bearish CHOCH", "Bearish change of character confirmed")
+alertcondition(bullSweep, "Sell-side Liquidity Sweep", "Sell-side liquidity swept and reclaimed")
+alertcondition(bearSweep, "Buy-side Liquidity Sweep", "Buy-side liquidity swept and rejected")
