@@ -1,0 +1,22 @@
+services:
+  api:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    command: ["uvicorn","app:app","--host","0.0.0.0","--port","8080","--proxy-headers"]
+    ports:
+      - "8080:8080"
+    volumes:
+      - research-data:/data
+  streamer:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    command: ["python","stream.py"]
+    volumes:
+      - research-data:/data
+    depends_on:
+      - api
+
+volumes:
+  research-data:
