@@ -1,5 +1,5 @@
 //@version=6
-indicator("Advanced Pattern Intelligence System v2", overlay=true, max_bars_back=1000, max_lines_count=500, max_labels_count=500, max_boxes_count=200, dynamic_requests=true)
+indicator("Advanced Pattern Intelligence System v3 — SMC Fusion", overlay=true, max_bars_back=1000, max_lines_count=500, max_labels_count=500, max_boxes_count=200, dynamic_requests=true)
 
 // ============================================================
 // INPUTS
@@ -70,6 +70,56 @@ tablePosition     = input.string("top_right", "Pattern Matrix", options=["top_le
 explainPosition   = input.string("middle_right", "Explanation Panel", options=["top_left", "top_center", "top_right", "middle_left", "middle_center", "middle_right", "bottom_left", "bottom_center", "bottom_right"], group=g7)
 panelTextSize     = input.string("small", "Panel Text Size", options=["tiny", "small", "normal", "large"], group=g7)
 
+
+g8 = "ICT / SMC Execution"
+detectExecution   = input.bool(true, "Execution Stack", group=g8)
+detectOB          = input.bool(true, "Order Blocks", group=g8)
+detectIFVG        = input.bool(true, "Inverse FVGs", group=g8)
+detectOTE         = input.bool(true, "OTE 0.62-0.79", group=g8)
+detectEqualLiq    = input.bool(true, "Equal High / Low Liquidity", group=g8)
+obSearch          = input.int(12, "OB Search Back", minval=3, maxval=40, group=g8)
+obInvalidateClose = input.bool(true, "Invalidate OB On Close", group=g8)
+oteLowFib         = input.float(0.62, "OTE Shallow Fib", minval=0.50, maxval=0.75, step=0.005, group=g8)
+oteHighFib        = input.float(0.79, "OTE Deep Fib", minval=0.70, maxval=0.90, step=0.005, group=g8)
+oteSweetFib       = input.float(0.705, "OTE Sweet Spot", minval=0.60, maxval=0.85, step=0.005, group=g8)
+minExecutionScore = input.float(68.0, "Minimum Execution Score", minval=40, maxval=95, step=1, group=g8)
+minTargetRR       = input.float(6.0, "Target Minimum R Multiple", minval=1.0, maxval=20.0, step=0.5, group=g8)
+stopBufferATR     = input.float(0.15, "Stop Buffer (ATR)", minval=0.0, maxval=1.0, step=0.05, group=g8)
+
+g9 = "Liquidity / Sessions / DOL"
+useKillzones      = input.bool(true, "Score Killzones", group=g9)
+sessionTz         = input.string("America/New_York", "Session Timezone", group=g9)
+londonSession     = input.session("0200-0500", "London Killzone", group=g9)
+nySession         = input.session("0700-1000", "New York Killzone", group=g9)
+showDOL           = input.bool(true, "Show Previous Day/Week Liquidity", group=g9)
+equalLiquidityATR = input.float(0.25, "EQH/EQL Tolerance (ATR)", minval=0.05, maxval=1.0, step=0.05, group=g9)
+
+g10 = "SMT / Divergence"
+useSMT            = input.bool(false, "Use SMT References", group=g10)
+smtSymbolA        = input.symbol("TVC:DXY", "SMT Reference A", group=g10)
+smtRelationA      = input.string("Inverse", "Reference A Relationship", options=["Same", "Inverse"], group=g10)
+smtSymbolB        = input.symbol("BINANCE:BTCUSDT", "SMT Reference B", group=g10)
+smtRelationB      = input.string("Same", "Reference B Relationship", options=["Same", "Inverse"], group=g10)
+smtLookback       = input.int(20, "SMT Breakout Window", minval=5, maxval=100, group=g10)
+rsiLen            = input.int(14, "RSI Divergence Length", minval=5, maxval=50, group=g10)
+divMemory         = input.int(12, "Divergence Context Memory", minval=2, maxval=50, group=g10)
+
+g11 = "Regime / MTF Narrative"
+midTf             = input.timeframe("60", "Intermediate Timeframe", group=g11)
+midFastLen        = input.int(20, "MTF Fast EMA", minval=5, maxval=100, group=g11)
+midSlowLen        = input.int(50, "MTF Slow EMA", minval=10, maxval=250, group=g11)
+adxLen            = input.int(14, "ADX Length", minval=5, maxval=50, group=g11)
+adxSmooth         = input.int(14, "ADX Smoothing", minval=5, maxval=50, group=g11)
+adxTrendThreshold = input.float(20.0, "Trend Regime ADX", minval=5, maxval=50, step=1, group=g11)
+vwapZLen          = input.int(50, "VWAP Z-Score Window", minval=20, maxval=200, group=g11)
+
+g12 = "Execution Display"
+showExecutionPanel = input.bool(true, "Show Execution Dashboard", group=g12)
+showOTEZones       = input.bool(true, "Show OTE Zones", group=g12)
+showOBZones        = input.bool(true, "Show Order Blocks", group=g12)
+showIFVGZones      = input.bool(true, "Show IFVG Zones", group=g12)
+executionPosition  = input.string("bottom_right", "Execution Dashboard", options=["top_left", "top_center", "top_right", "middle_left", "middle_center", "middle_right", "bottom_left", "bottom_center", "bottom_right"], group=g12)
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -136,6 +186,52 @@ f_ratio_near(float value, float target, float tolerance) =>
 
 f_ratio_range(float value, float lo, float hi) =>
     not na(value) and value >= lo and value <= hi
+
+f_nearest_above(float price, float a, float b, float c, float d) =>
+    float out = na
+    if not na(a) and a > price
+        out := a
+    if not na(b) and b > price and (na(out) or b < out)
+        out := b
+    if not na(c) and c > price and (na(out) or c < out)
+        out := c
+    if not na(d) and d > price and (na(out) or d < out)
+        out := d
+    out
+
+f_nearest_below(float price, float a, float b, float c, float d) =>
+    float out = na
+    if not na(a) and a < price
+        out := a
+    if not na(b) and b < price and (na(out) or b > out)
+        out := b
+    if not na(c) and c < price and (na(out) or c > out)
+        out := c
+    if not na(d) and d < price and (na(out) or d > out)
+        out := d
+    out
+
+f_find_ob(bool bullish, int searchBack) =>
+    float top = na
+    float bottom = na
+    int obBar = na
+    for i = 1 to searchBack
+        bool opposite = bullish ? close[i] < open[i] : close[i] > open[i]
+        if opposite and na(obBar)
+            top := high[i]
+            bottom := low[i]
+            obBar := bar_index - i
+    [top, bottom, obBar]
+
+f_rr(float entry, float stop, float target) =>
+    float risk = math.abs(entry - stop)
+    not na(entry) and not na(stop) and not na(target) and risk > syminfo.mintick ? math.abs(target - entry) / risk : na
+
+f_smt_bull(string relation, bool chartBreakLow, bool refBreakLow, bool refBreakHigh) =>
+    chartBreakLow and (relation == "Same" ? not refBreakLow : not refBreakHigh)
+
+f_smt_bear(string relation, bool chartBreakHigh, bool refBreakHigh, bool refBreakLow) =>
+    chartBreakHigh and (relation == "Same" ? not refBreakHigh : not refBreakLow)
 
 // Maintains an alternating, significance-filtered swing graph.
 f_add_swing(array<float> prices, array<int> bars, array<int> kinds, float price, int pivotBar, int kind, float minMove, int memory) =>
@@ -221,6 +317,21 @@ volConfirmed = not na(volume) and not na(volBase) and volume > volBase * volumeM
 bullDisplacement = close > open and bodyATR >= displacementATR
 bearDisplacement = close < open and bodyATR >= displacementATR
 
+// Regime and location are observed states, not standalone entry signals.
+[diPlus, diMinus, adx] = ta.dmi(adxLen, adxSmooth)
+atrRegimeBase = ta.sma(atr, 50)
+atrRegimeRatio = atr / math.max(nz(atrRegimeBase, atr), syminfo.mintick)
+trendRegime = adx >= adxTrendThreshold
+expansionRegime = atrRegimeRatio >= 1.10
+chartVwap = ta.vwap(hlc3)
+vwapDev = close - chartVwap
+vwapDevStdev = ta.stdev(vwapDev, vwapZLen)
+vwapZ = not na(vwapDevStdev) and vwapDevStdev > syminfo.mintick ? vwapDev / vwapDevStdev : 0.0
+
+inLondon = not na(time(timeframe.period, londonSession, sessionTz))
+inNY = not na(time(timeframe.period, nySession, sessionTz))
+inKillzone = inLondon or inNY
+
 bool htfValid = timeframe.in_seconds(htfTf) > timeframe.in_seconds(timeframe.period)
 float htfClose = na
 float htfFast = na
@@ -232,6 +343,17 @@ if useHTF and htfValid
 
 htfBull = useHTF and htfValid and not na(htfClose) and htfClose > htfFast and htfFast > htfSlow
 htfBear = useHTF and htfValid and not na(htfClose) and htfClose < htfFast and htfFast < htfSlow
+
+bool midValid = timeframe.in_seconds(midTf) > timeframe.in_seconds(timeframe.period)
+float midClose = na
+float midFast = na
+float midSlow = na
+if midValid
+    midClose := request.security(syminfo.tickerid, midTf, close[1], lookahead=barmerge.lookahead_on)
+    midFast := request.security(syminfo.tickerid, midTf, ta.ema(close, midFastLen)[1], lookahead=barmerge.lookahead_on)
+    midSlow := request.security(syminfo.tickerid, midTf, ta.ema(close, midSlowLen)[1], lookahead=barmerge.lookahead_on)
+midBull = midValid and not na(midClose) and midClose > midFast and midFast > midSlow
+midBear = midValid and not na(midClose) and midClose < midFast and midFast < midSlow
 
 // Confirmed pivots. The pivot is only known pivotLen bars after it occurs.
 ph = ta.pivothigh(high, pivotLen, pivotLen)
@@ -267,6 +389,73 @@ bearBOS = bearBreak and not structBull
 bullSweep = not na(lastLow) and low < lastLow and close > lastLow
 bearSweep = not na(lastHigh) and high > lastHigh and close < lastHigh
 
+// Liquidity pools and structural strength.
+equalHigh = not na(lastHigh) and not na(prevHigh) and math.abs(lastHigh - prevHigh) <= atrSafe * equalLiquidityATR
+equalLow = not na(lastLow) and not na(prevLow) and math.abs(lastLow - prevLow) <= atrSafe * equalLiquidityATR
+weakHigh = structBull
+strongLow = structBull
+weakLow = structBear
+strongHigh = structBear
+dealingHigh = not na(lastHigh) ? lastHigh : na
+dealingLow = not na(lastLow) ? lastLow : na
+dealingMid = not na(dealingHigh) and not na(dealingLow) ? (dealingHigh + dealingLow) / 2.0 : na
+inDiscount = not na(dealingMid) and close < dealingMid
+inPremium = not na(dealingMid) and close > dealingMid
+
+// Confirmed previous-day/week external liquidity (DOL candidates).
+pdh = request.security(syminfo.tickerid, "D", high[1], lookahead=barmerge.lookahead_on)
+pdl = request.security(syminfo.tickerid, "D", low[1], lookahead=barmerge.lookahead_on)
+pwh = request.security(syminfo.tickerid, "W", high[1], lookahead=barmerge.lookahead_on)
+pwl = request.security(syminfo.tickerid, "W", low[1], lookahead=barmerge.lookahead_on)
+
+// Local price/RSI divergence on confirmed pivots.
+rsiValue = ta.rsi(close, rsiLen)
+var float divLastLowPrice = na
+var float divPrevLowPrice = na
+var float divLastLowRsi = na
+var float divPrevLowRsi = na
+var float divLastHighPrice = na
+var float divPrevHighPrice = na
+var float divLastHighRsi = na
+var float divPrevHighRsi = na
+bool bullRegDivEvent = false
+bool bullHiddenDivEvent = false
+bool bearRegDivEvent = false
+bool bearHiddenDivEvent = false
+if not na(pl)
+    divPrevLowPrice := divLastLowPrice
+    divPrevLowRsi := divLastLowRsi
+    divLastLowPrice := pl
+    divLastLowRsi := rsiValue[pivotLen]
+    bullRegDivEvent := not na(divPrevLowPrice) and pl < divPrevLowPrice and divLastLowRsi > divPrevLowRsi
+    bullHiddenDivEvent := not na(divPrevLowPrice) and pl > divPrevLowPrice and divLastLowRsi < divPrevLowRsi
+if not na(ph)
+    divPrevHighPrice := divLastHighPrice
+    divPrevHighRsi := divLastHighRsi
+    divLastHighPrice := ph
+    divLastHighRsi := rsiValue[pivotLen]
+    bearRegDivEvent := not na(divPrevHighPrice) and ph > divPrevHighPrice and divLastHighRsi < divPrevHighRsi
+    bearHiddenDivEvent := not na(divPrevHighPrice) and ph < divPrevHighPrice and divLastHighRsi > divPrevHighRsi
+
+bullDivRecent = nz(ta.barssince(bullRegDivEvent or bullHiddenDivEvent), 100000) <= divMemory
+bearDivRecent = nz(ta.barssince(bearRegDivEvent or bearHiddenDivEvent), 100000) <= divMemory
+
+// SMT divergence against two user-selected references.
+chartBreakHigh = high > ta.highest(high, smtLookback)[1]
+chartBreakLow = low < ta.lowest(low, smtLookback)[1]
+refABreakHigh = request.security(smtSymbolA, timeframe.period, high > ta.highest(high, smtLookback)[1], lookahead=barmerge.lookahead_off)
+refABreakLow = request.security(smtSymbolA, timeframe.period, low < ta.lowest(low, smtLookback)[1], lookahead=barmerge.lookahead_off)
+refBBreakHigh = request.security(smtSymbolB, timeframe.period, high > ta.highest(high, smtLookback)[1], lookahead=barmerge.lookahead_off)
+refBBreakLow = request.security(smtSymbolB, timeframe.period, low < ta.lowest(low, smtLookback)[1], lookahead=barmerge.lookahead_off)
+bullSmtA = useSMT and f_smt_bull(smtRelationA, chartBreakLow, refABreakLow, refABreakHigh)
+bearSmtA = useSMT and f_smt_bear(smtRelationA, chartBreakHigh, refABreakHigh, refABreakLow)
+bullSmtB = useSMT and f_smt_bull(smtRelationB, chartBreakLow, refBBreakLow, refBBreakHigh)
+bearSmtB = useSMT and f_smt_bear(smtRelationB, chartBreakHigh, refBBreakHigh, refBBreakLow)
+bullSmtCount = (bullSmtA ? 1 : 0) + (bullSmtB ? 1 : 0)
+bearSmtCount = (bearSmtA ? 1 : 0) + (bearSmtB ? 1 : 0)
+bullSmtRecent = nz(ta.barssince(bullSmtCount > 0), 100000) <= divMemory
+bearSmtRecent = nz(ta.barssince(bearSmtCount > 0), 100000) <= divMemory
+
 // Fair value gaps and latest active zones.
 bullFvgEvent = low > high[2]
 bearFvgEvent = high < low[2]
@@ -287,14 +476,37 @@ if bearFvgEvent
     bearFvgBottom := high
     bearFvgBar := bar_index
 
-if not na(bullFvgBottom) and low <= bullFvgBottom
+var float bullIfvgTop = na
+var float bullIfvgBottom = na
+var int bullIfvgBar = na
+var float bearIfvgTop = na
+var float bearIfvgBottom = na
+var int bearIfvgBar = na
+
+// A close through an FVG creates an inverse-FVG candidate; a mere touch is mitigation.
+if not na(bullFvgBottom) and close < bullFvgBottom
+    bearIfvgTop := bullFvgTop
+    bearIfvgBottom := bullFvgBottom
+    bearIfvgBar := bar_index
     bullFvgTop := na
     bullFvgBottom := na
     bullFvgBar := na
-if not na(bearFvgTop) and high >= bearFvgTop
+if not na(bearFvgTop) and close > bearFvgTop
+    bullIfvgTop := bearFvgTop
+    bullIfvgBottom := bearFvgBottom
+    bullIfvgBar := bar_index
     bearFvgTop := na
     bearFvgBottom := na
     bearFvgBar := na
+
+if not na(bullIfvgBottom) and close < bullIfvgBottom
+    bullIfvgTop := na
+    bullIfvgBottom := na
+    bullIfvgBar := na
+if not na(bearIfvgTop) and close > bearIfvgTop
+    bearIfvgTop := na
+    bearIfvgBottom := na
+    bearIfvgBar := na
 
 bullFvgAge = nz(ta.barssince(bullFvgEvent), 100000)
 bearFvgAge = nz(ta.barssince(bearFvgEvent), 100000)
@@ -302,6 +514,47 @@ bullFvgRecent = bullFvgAge <= fvgMemory
 bearFvgRecent = bearFvgAge <= fvgMemory
 bullFvgRetrace = not na(bullFvgTop) and not na(bullFvgBar) and bar_index > bullFvgBar and low <= bullFvgTop and high >= bullFvgBottom
 bearFvgRetrace = not na(bearFvgTop) and not na(bearFvgBar) and bar_index > bearFvgBar and high >= bearFvgBottom and low <= bearFvgTop
+
+bullIfvgRetrace = not na(bullIfvgTop) and not na(bullIfvgBar) and bar_index > bullIfvgBar and low <= bullIfvgTop and high >= bullIfvgBottom
+bearIfvgRetrace = not na(bearIfvgTop) and not na(bearIfvgBar) and bar_index > bearIfvgBar and high >= bearIfvgBottom and low <= bearIfvgTop
+
+[bullObCandidateTop, bullObCandidateBottom, bullObCandidateBar] = f_find_ob(true, obSearch)
+[bearObCandidateTop, bearObCandidateBottom, bearObCandidateBar] = f_find_ob(false, obSearch)
+var float bullObTop = na
+var float bullObBottom = na
+var int bullObBar = na
+var float bearObTop = na
+var float bearObBottom = na
+var int bearObBar = na
+if bullBreak and bullDisplacement and not na(bullObCandidateBar)
+    bullObTop := bullObCandidateTop
+    bullObBottom := bullObCandidateBottom
+    bullObBar := bullObCandidateBar
+if bearBreak and bearDisplacement and not na(bearObCandidateBar)
+    bearObTop := bearObCandidateTop
+    bearObBottom := bearObCandidateBottom
+    bearObBar := bearObCandidateBar
+
+bullObRetrace = not na(bullObTop) and low <= bullObTop and high >= bullObBottom and bar_index > nz(bullObBar, bar_index)
+bearObRetrace = not na(bearObTop) and high >= bearObBottom and low <= bearObTop and bar_index > nz(bearObBar, bar_index)
+if not na(bullObBottom) and (obInvalidateClose ? close < bullObBottom : low < bullObBottom)
+    bullObTop := na
+    bullObBottom := na
+    bullObBar := na
+if not na(bearObTop) and (obInvalidateClose ? close > bearObTop : high > bearObTop)
+    bearObTop := na
+    bearObBottom := na
+    bearObBar := na
+
+dealingRange = not na(lastHigh) and not na(lastLow) ? math.abs(lastHigh - lastLow) : na
+bullOteUpper = not na(dealingRange) ? lastHigh - dealingRange * oteLowFib : na
+bullOteLower = not na(dealingRange) ? lastHigh - dealingRange * oteHighFib : na
+bullOteSweet = not na(dealingRange) ? lastHigh - dealingRange * oteSweetFib : na
+bearOteLower = not na(dealingRange) ? lastLow + dealingRange * oteLowFib : na
+bearOteUpper = not na(dealingRange) ? lastLow + dealingRange * oteHighFib : na
+bearOteSweet = not na(dealingRange) ? lastLow + dealingRange * oteSweetFib : na
+bullOteEntry = detectOTE and not na(bullOteLower) and close >= bullOteLower and close <= bullOteUpper and inDiscount
+bearOteEntry = detectOTE and not na(bearOteUpper) and close <= bearOteUpper and close >= bearOteLower and inPremium
 
 // Compression state. Precompute history-sensitive series on every bar.
 compressionHigh = ta.highest(high, compressionLen)
@@ -334,6 +587,76 @@ bearChochAge = nz(ta.barssince(bearCHOCH), 100000)
 bullDispAge = nz(ta.barssince(bullDisplacement), 100000)
 bearDispAge = nz(ta.barssince(bearDisplacement), 100000)
 coilAge = nz(ta.barssince(coilActive), 100000)
+
+bullSweepEventBar = ta.valuewhen(bullSweep, bar_index, 0)
+bearSweepEventBar = ta.valuewhen(bearSweep, bar_index, 0)
+bullBreakEventBar = ta.valuewhen(bullBreak, bar_index, 0)
+bearBreakEventBar = ta.valuewhen(bearBreak, bar_index, 0)
+bullDispEventBar = ta.valuewhen(bullDisplacement, bar_index, 0)
+bearDispEventBar = ta.valuewhen(bearDisplacement, bar_index, 0)
+bullFvgEventBar = ta.valuewhen(bullFvgEvent, bar_index, 0)
+bearFvgEventBar = ta.valuewhen(bearFvgEvent, bar_index, 0)
+
+bullOrdered = not na(bullSweepEventBar) and not na(bullBreakEventBar) and not na(bullDispEventBar) and not na(bullFvgEventBar) and bullSweepEventBar <= bullBreakEventBar and bullBreakEventBar <= bullDispEventBar and bullDispEventBar <= bullFvgEventBar and bar_index - bullSweepEventBar <= sequenceWindow
+bearOrdered = not na(bearSweepEventBar) and not na(bearBreakEventBar) and not na(bearDispEventBar) and not na(bearFvgEventBar) and bearSweepEventBar <= bearBreakEventBar and bearBreakEventBar <= bearDispEventBar and bearDispEventBar <= bearFvgEventBar and bar_index - bearSweepEventBar <= sequenceWindow
+
+bullEntry = bullOteEntry ? bullOteSweet : bullFvgRetrace and not na(bullFvgTop) ? (bullFvgTop + bullFvgBottom) / 2.0 : bullIfvgRetrace and not na(bullIfvgTop) ? (bullIfvgTop + bullIfvgBottom) / 2.0 : bullObRetrace and not na(bullObTop) ? (bullObTop + bullObBottom) / 2.0 : close
+bearEntry = bearOteEntry ? bearOteSweet : bearFvgRetrace and not na(bearFvgTop) ? (bearFvgTop + bearFvgBottom) / 2.0 : bearIfvgRetrace and not na(bearIfvgTop) ? (bearIfvgTop + bearIfvgBottom) / 2.0 : bearObRetrace and not na(bearObTop) ? (bearObTop + bearObBottom) / 2.0 : close
+bullSweepExtreme = ta.valuewhen(bullSweep, low, 0)
+bearSweepExtreme = ta.valuewhen(bearSweep, high, 0)
+bullStopBase = not na(bullObBottom) ? math.min(nz(bullSweepExtreme, bullObBottom), bullObBottom) : nz(bullSweepExtreme, lastLow)
+bearStopBase = not na(bearObTop) ? math.max(nz(bearSweepExtreme, bearObTop), bearObTop) : nz(bearSweepExtreme, lastHigh)
+bullStop = not na(bullStopBase) ? bullStopBase - atrSafe * stopBufferATR : na
+bearStop = not na(bearStopBase) ? bearStopBase + atrSafe * stopBufferATR : na
+bullDOL = f_nearest_above(bullEntry, pdh, pwh, lastHigh, prevHigh)
+bearDOL = f_nearest_below(bearEntry, pdl, pwl, lastLow, prevLow)
+bullRR = f_rr(bullEntry, bullStop, bullDOL)
+bearRR = f_rr(bearEntry, bearStop, bearDOL)
+bullRRPass = not na(bullRR) and bullRR >= minTargetRR
+bearRRPass = not na(bearRR) and bearRR >= minTargetRR
+
+bullEntryTouch = bullOteEntry or bullFvgRetrace or bullIfvgRetrace or bullObRetrace
+bearEntryTouch = bearOteEntry or bearFvgRetrace or bearIfvgRetrace or bearObRetrace
+bullNarrative = htfBull and (not midValid or midBull)
+bearNarrative = htfBear and (not midValid or midBear)
+bullSetupScore = 0.0
+bullSetupScore += bullNarrative ? 14.0 : htfBull ? 8.0 : 0.0
+bullSetupScore += structBull or bullCHOCH ? 8.0 : 0.0
+bullSetupScore += bullSweepAge <= sequenceWindow ? 10.0 : 0.0
+bullSetupScore += bullChochAge <= sequenceWindow ? 12.0 : 0.0
+bullSetupScore += bullDispAge <= sequenceWindow ? 10.0 : 0.0
+bullSetupScore += bullFvgRecent or bullIfvgRetrace ? 8.0 : 0.0
+bullSetupScore += bullObRetrace ? 6.0 : 0.0
+bullSetupScore += bullOteEntry ? 8.0 : 0.0
+bullSetupScore += bullSmtRecent ? 6.0 : 0.0
+bullSetupScore += bullDivRecent ? 4.0 : 0.0
+bullSetupScore += volConfirmed ? 3.0 : 0.0
+bullSetupScore += trendRegime or expansionRegime ? 3.0 : 0.0
+bullSetupScore += useKillzones and inKillzone ? 4.0 : not useKillzones ? 2.0 : 0.0
+bullSetupScore += bullRRPass ? 8.0 : 0.0
+bullSetupScore += bullOrdered ? 10.0 : 0.0
+bullSetupScore := f_clamp(bullSetupScore, 0.0, 99.0)
+
+bearSetupScore = 0.0
+bearSetupScore += bearNarrative ? 14.0 : htfBear ? 8.0 : 0.0
+bearSetupScore += structBear or bearCHOCH ? 8.0 : 0.0
+bearSetupScore += bearSweepAge <= sequenceWindow ? 10.0 : 0.0
+bearSetupScore += bearChochAge <= sequenceWindow ? 12.0 : 0.0
+bearSetupScore += bearDispAge <= sequenceWindow ? 10.0 : 0.0
+bearSetupScore += bearFvgRecent or bearIfvgRetrace ? 8.0 : 0.0
+bearSetupScore += bearObRetrace ? 6.0 : 0.0
+bearSetupScore += bearOteEntry ? 8.0 : 0.0
+bearSetupScore += bearSmtRecent ? 6.0 : 0.0
+bearSetupScore += bearDivRecent ? 4.0 : 0.0
+bearSetupScore += volConfirmed ? 3.0 : 0.0
+bearSetupScore += trendRegime or expansionRegime ? 3.0 : 0.0
+bearSetupScore += useKillzones and inKillzone ? 4.0 : not useKillzones ? 2.0 : 0.0
+bearSetupScore += bearRRPass ? 8.0 : 0.0
+bearSetupScore += bearOrdered ? 10.0 : 0.0
+bearSetupScore := f_clamp(bearSetupScore, 0.0, 99.0)
+
+bullExecutionReady = detectExecution and bullSetupScore >= minExecutionScore and bullOrdered and bullEntryTouch and (na(bullRR) or bullRRPass)
+bearExecutionReady = detectExecution and bearSetupScore >= minExecutionScore and bearOrdered and bearEntryTouch and (na(bearRR) or bearRRPass)
 
 // ============================================================
 // DETECTORS
