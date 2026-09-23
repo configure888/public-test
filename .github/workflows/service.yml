@@ -1,0 +1,38 @@
+name: Research Service
+
+on:
+  push:
+    paths:
+      - 'service/**'
+      - 'research/**'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.github/workflows/service.yml'
+  pull_request:
+    paths:
+      - 'service/**'
+      - 'research/**'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.github/workflows/service.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install service dependencies
+        run: pip install -r service/requirements.txt
+      - name: Compile Python
+        run: python -m py_compile service/*.py research/*.py
+      - name: Unit tests
+        working-directory: service
+        run: python -m unittest -v test_service.py
+      - name: FastAPI smoke import
+        run: PYTHONPATH=service DB_PATH=/tmp/pattern-intelligence-test.db python -c "import app; assert app.app.version"
+      - name: Build container
+        run: docker build -t pattern-intelligence:test .
