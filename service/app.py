@@ -91,7 +91,7 @@ async def _enrich(event_id: str, payload: dict[str, Any]) -> None:
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "version": app.version, **store.health_counts()}
+    return {"ok": True, "version": app.version, **store.health_counts(), "latest_snapshots": store.latest_snapshots()}
 
 
 @app.post("/webhook/tradingview/{token}")
