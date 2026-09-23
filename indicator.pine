@@ -138,6 +138,13 @@ enableJevExport    = input.bool(false, "Export Qualified Candidates to Jev", gro
 jevMinScore        = input.float(78.0, "Jev Minimum Internal Score", minval=50.0, maxval=99.0, step=1.0, group=g13)
 jevRequireRR       = input.bool(true, "Jev Requires 6R Gate", group=g13)
 
+
+g14 = "Research / Calibration Export"
+enableResearchExport = input.bool(false, "Export Research Candidates", group=g14)
+researchMinScore     = input.float(45.0, "Research Minimum Grouped Score", minval=0.0, maxval=99.0, step=1.0, group=g14)
+researchRequireRR    = input.bool(false, "Research Export Requires 6R", group=g14)
+researchCooldownBars = input.int(5, "Research Duplicate Cooldown", minval=1, maxval=100, group=g14)
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -771,6 +778,31 @@ bearContinuationReady = detectExecution and bearContinuationScore >= minExecutio
 bullExecutionReady = detectExecution and bullSetupScore >= minExecutionScore and bullOrdered and bullEntryTouch and mtfBullAligned and macroBullAligned and (na(bullRR) or bullRRPass)
 bearExecutionReady = detectExecution and bearSetupScore >= minExecutionScore and bearOrdered and bearEntryTouch and mtfBearAligned and macroBearAligned and (na(bearRR) or bearRRPass)
 
+
+// Grouped evidence scores reduce double-counting among correlated confluences.
+// These scores are for research/calibration; the legacy score remains visible for continuity.
+bullRevStructureBucket = bullOrdered ? 25.0 : (bullChochAge <= sequenceWindow ? 12.0 : 0.0) + (bullDispAge <= sequenceWindow ? 6.0 : 0.0)
+bearRevStructureBucket = bearOrdered ? 25.0 : (bearChochAge <= sequenceWindow ? 12.0 : 0.0) + (bearDispAge <= sequenceWindow ? 6.0 : 0.0)
+bullRevLiquidityBucket = math.min(20.0, (bullSweepAge <= sequenceWindow ? 10.0 : 0.0) + (bullSmtRecent ? 5.0 : 0.0) + (bullRegDivRecent ? 5.0 : 0.0))
+bearRevLiquidityBucket = math.min(20.0, (bearSweepAge <= sequenceWindow ? 10.0 : 0.0) + (bearSmtRecent ? 5.0 : 0.0) + (bearRegDivRecent ? 5.0 : 0.0))
+bullPdBucket = math.min(20.0, (bullFvgRetrace ? 6.0 : 0.0) + (bullIfvgRetrace ? 7.0 : 0.0) + (bullObRetrace ? 7.0 : 0.0) + (bullOteEntry ? 7.0 : 0.0))
+bearPdBucket = math.min(20.0, (bearFvgRetrace ? 6.0 : 0.0) + (bearIfvgRetrace ? 7.0 : 0.0) + (bearObRetrace ? 7.0 : 0.0) + (bearOteEntry ? 7.0 : 0.0))
+bullNarrativeBucket = math.min(15.0, (bullNarrative ? 5.0 : 0.0) + (useMtfMatrix ? mtfBullCount * 2.0 : 0.0) + (macroBullAligned ? 2.0 : 0.0) + (inKillzone ? 2.0 : 0.0))
+bearNarrativeBucket = math.min(15.0, (bearNarrative ? 5.0 : 0.0) + (useMtfMatrix ? mtfBearCount * 2.0 : 0.0) + (macroBearAligned ? 2.0 : 0.0) + (inKillzone ? 2.0 : 0.0))
+bullQualityBucket = math.min(10.0, (volConfirmed ? 2.0 : 0.0) + (flowBull ? 2.0 : 0.0) + (trendRegime or expansionRegime ? 2.0 : 0.0) + (bullDivRecent ? 2.0 : 0.0) + (bullEntryTouch ? 2.0 : 0.0))
+bearQualityBucket = math.min(10.0, (volConfirmed ? 2.0 : 0.0) + (flowBear ? 2.0 : 0.0) + (trendRegime or expansionRegime ? 2.0 : 0.0) + (bearDivRecent ? 2.0 : 0.0) + (bearEntryTouch ? 2.0 : 0.0))
+bullRRBucket = na(bullRR) ? 0.0 : bullRR >= 6.0 ? 10.0 : bullRR >= 4.0 ? 6.0 : bullRR >= 2.0 ? 3.0 : 0.0
+bearRRBucket = na(bearRR) ? 0.0 : bearRR >= 6.0 ? 10.0 : bearRR >= 4.0 ? 6.0 : bearRR >= 2.0 ? 3.0 : 0.0
+bullResearchScore = f_clamp(bullRevStructureBucket + bullRevLiquidityBucket + bullPdBucket + bullNarrativeBucket + bullQualityBucket + bullRRBucket, 0.0, 100.0)
+bearResearchScore = f_clamp(bearRevStructureBucket + bearRevLiquidityBucket + bearPdBucket + bearNarrativeBucket + bearQualityBucket + bearRRBucket, 0.0, 100.0)
+
+bullContStructureBucket = bullContinuationOrdered ? 25.0 : (bullBosAge <= sequenceWindow ? 12.0 : 0.0) + (bullDispAge <= sequenceWindow ? 6.0 : 0.0)
+bearContStructureBucket = bearContinuationOrdered ? 25.0 : (bearBosAge <= sequenceWindow ? 12.0 : 0.0) + (bearDispAge <= sequenceWindow ? 6.0 : 0.0)
+bullContMomentumBucket = math.min(20.0, (bullHiddenDivRecent ? 8.0 : 0.0) + (bullSmtRecent ? 5.0 : 0.0) + (coilAge <= sequenceWindow ? 7.0 : 0.0))
+bearContMomentumBucket = math.min(20.0, (bearHiddenDivRecent ? 8.0 : 0.0) + (bearSmtRecent ? 5.0 : 0.0) + (coilAge <= sequenceWindow ? 7.0 : 0.0))
+bullContinuationResearchScore = f_clamp(bullContStructureBucket + bullContMomentumBucket + bullPdBucket + bullNarrativeBucket + bullQualityBucket + bullRRBucket, 0.0, 100.0)
+bearContinuationResearchScore = f_clamp(bearContStructureBucket + bearContMomentumBucket + bearPdBucket + bearNarrativeBucket + bearQualityBucket + bearRRBucket, 0.0, 100.0)
+
 // ============================================================
 // DETECTORS
 // ============================================================
@@ -1234,6 +1266,10 @@ plot(bearRR, "Bear DOL R", display=display.data_window)
 plot(float(mtfBullCount), "MTF Bull Votes", display=display.data_window)
 plot(float(mtfBearCount), "MTF Bear Votes", display=display.data_window)
 plot(flowBaseline, "Flow Proxy", display=display.data_window)
+plot(bullResearchScore, "Bull Grouped Research Score", display=display.data_window)
+plot(bearResearchScore, "Bear Grouped Research Score", display=display.data_window)
+plot(bullContinuationResearchScore, "Bull Continuation Research Score", display=display.data_window)
+plot(bearContinuationResearchScore, "Bear Continuation Research Score", display=display.data_window)
 
 var array<line> drawLines = array.new<line>()
 var array<label> drawLabels = array.new<label>()
@@ -1419,3 +1455,24 @@ if barstate.isconfirmed and jevBearReady and nz(lastJevBearBar, -1) != bar_index
     string payload = "{\"type\":\"jev_candidate\",\"symbol\":\"" + syminfo.tickerid + "\",\"tf\":\"" + timeframe.period + "\",\"side\":\"short\",\"score\":" + str.tostring(jevBearScore, "#.0") + ",\"rr\":" + str.tostring(bearRR, "#.2") + ",\"entry\":" + str.tostring(bearEntry, format.mintick) + ",\"stop\":" + str.tostring(bearStop, format.mintick) + ",\"dol\":" + str.tostring(bearDOL, format.mintick) + ",\"mtf_votes\":" + str.tostring(mtfBearCount) + ",\"sweep\":" + (bearSweepAge <= sequenceWindow ? "true" : "false") + ",\"smt\":" + (bearSmtRecent ? "true" : "false") + ",\"hidden_div\":" + (bearHiddenDivRecent ? "true" : "false") + ",\"fvg\":" + (bearFvgRecent ? "true" : "false") + ",\"ifvg\":" + (bearIfvgRetrace ? "true" : "false") + ",\"ob\":" + (bearObRetrace ? "true" : "false") + ",\"ote\":" + (bearOteEntry ? "true" : "false") + ",\"coil\":" + (coilActive ? "true" : "false") + ",\"vwap_z\":" + str.tostring(vwapZ, "#.2") + "}"
     alert(payload, alert.freq_once_per_bar_close)
     lastJevBearBar := bar_index
+
+// Research export intentionally samples candidates before the final A+ gate so failed/mediocre
+// setups remain in the calibration set. Do not train only on trades that already passed 6R.
+bullResearchFamily = bullResearchScore >= bullContinuationResearchScore ? "reversal" : "continuation"
+bearResearchFamily = bearResearchScore >= bearContinuationResearchScore ? "reversal" : "continuation"
+bullResearchLeadScore = math.max(bullResearchScore, bullContinuationResearchScore)
+bearResearchLeadScore = math.max(bearResearchScore, bearContinuationResearchScore)
+bullResearchCandidate = enableResearchExport and bullEntryTouch and (bullOrdered or bullContinuationOrdered) and bullResearchLeadScore >= researchMinScore and (not researchRequireRR or bullRRPass)
+bearResearchCandidate = enableResearchExport and bearEntryTouch and (bearOrdered or bearContinuationOrdered) and bearResearchLeadScore >= researchMinScore and (not researchRequireRR or bearRRPass)
+var int lastResearchBullBar = na
+var int lastResearchBearBar = na
+
+if barstate.isconfirmed and bullResearchCandidate and (na(lastResearchBullBar) or bar_index - lastResearchBullBar >= researchCooldownBars)
+    string payload = "{\"type\":\"research_candidate\",\"event_id\":\"" + syminfo.tickerid + "-" + timeframe.period + "-L-" + str.tostring(time) + "\",\"symbol\":\"" + syminfo.tickerid + "\",\"tf\":\"" + timeframe.period + "\",\"time\":" + str.tostring(time) + ",\"side\":\"long\",\"family\":\"" + bullResearchFamily + "\",\"grouped_score\":" + str.tostring(bullResearchLeadScore, "#.0") + ",\"legacy_score\":" + str.tostring(math.max(bullSetupScore, bullContinuationScore), "#.0") + ",\"rr\":" + str.tostring(bullRR, "#.2") + ",\"entry\":" + str.tostring(bullEntry, format.mintick) + ",\"stop\":" + str.tostring(bullStop, format.mintick) + ",\"target\":" + str.tostring(bullDOL, format.mintick) + ",\"structure_bucket\":" + str.tostring(bullResearchFamily == "reversal" ? bullRevStructureBucket : bullContStructureBucket, "#.0") + ",\"liquidity_bucket\":" + str.tostring(bullResearchFamily == "reversal" ? bullRevLiquidityBucket : bullContMomentumBucket, "#.0") + ",\"pd_bucket\":" + str.tostring(bullPdBucket, "#.0") + ",\"narrative_bucket\":" + str.tostring(bullNarrativeBucket, "#.0") + ",\"quality_bucket\":" + str.tostring(bullQualityBucket, "#.0") + ",\"rr_bucket\":" + str.tostring(bullRRBucket, "#.0") + ",\"mtf_votes\":" + str.tostring(mtfBullCount) + ",\"sweep\":" + (bullSweepAge <= sequenceWindow ? "true" : "false") + ",\"smt\":" + (bullSmtRecent ? "true" : "false") + ",\"regular_div\":" + (bullRegDivRecent ? "true" : "false") + ",\"hidden_div\":" + (bullHiddenDivRecent ? "true" : "false") + ",\"fvg\":" + (bullFvgRetrace ? "true" : "false") + ",\"ifvg\":" + (bullIfvgRetrace ? "true" : "false") + ",\"ob\":" + (bullObRetrace ? "true" : "false") + ",\"ote\":" + (bullOteEntry ? "true" : "false") + ",\"coil\":" + (coilActive ? "true" : "false") + ",\"killzone\":" + (inKillzone ? "true" : "false") + ",\"vwap_z\":" + str.tostring(vwapZ, "#.2") + ",\"a_plus\":" + (bullExecutionReady or bullContinuationReady ? "true" : "false") + "}"
+    alert(payload, alert.freq_once_per_bar_close)
+    lastResearchBullBar := bar_index
+
+if barstate.isconfirmed and bearResearchCandidate and (na(lastResearchBearBar) or bar_index - lastResearchBearBar >= researchCooldownBars)
+    string payload = "{\"type\":\"research_candidate\",\"event_id\":\"" + syminfo.tickerid + "-" + timeframe.period + "-S-" + str.tostring(time) + "\",\"symbol\":\"" + syminfo.tickerid + "\",\"tf\":\"" + timeframe.period + "\",\"time\":" + str.tostring(time) + ",\"side\":\"short\",\"family\":\"" + bearResearchFamily + "\",\"grouped_score\":" + str.tostring(bearResearchLeadScore, "#.0") + ",\"legacy_score\":" + str.tostring(math.max(bearSetupScore, bearContinuationScore), "#.0") + ",\"rr\":" + str.tostring(bearRR, "#.2") + ",\"entry\":" + str.tostring(bearEntry, format.mintick) + ",\"stop\":" + str.tostring(bearStop, format.mintick) + ",\"target\":" + str.tostring(bearDOL, format.mintick) + ",\"structure_bucket\":" + str.tostring(bearResearchFamily == "reversal" ? bearRevStructureBucket : bearContStructureBucket, "#.0") + ",\"liquidity_bucket\":" + str.tostring(bearResearchFamily == "reversal" ? bearRevLiquidityBucket : bearContMomentumBucket, "#.0") + ",\"pd_bucket\":" + str.tostring(bearPdBucket, "#.0") + ",\"narrative_bucket\":" + str.tostring(bearNarrativeBucket, "#.0") + ",\"quality_bucket\":" + str.tostring(bearQualityBucket, "#.0") + ",\"rr_bucket\":" + str.tostring(bearRRBucket, "#.0") + ",\"mtf_votes\":" + str.tostring(mtfBearCount) + ",\"sweep\":" + (bearSweepAge <= sequenceWindow ? "true" : "false") + ",\"smt\":" + (bearSmtRecent ? "true" : "false") + ",\"regular_div\":" + (bearRegDivRecent ? "true" : "false") + ",\"hidden_div\":" + (bearHiddenDivRecent ? "true" : "false") + ",\"fvg\":" + (bearFvgRetrace ? "true" : "false") + ",\"ifvg\":" + (bearIfvgRetrace ? "true" : "false") + ",\"ob\":" + (bearObRetrace ? "true" : "false") + ",\"ote\":" + (bearOteEntry ? "true" : "false") + ",\"coil\":" + (coilActive ? "true" : "false") + ",\"killzone\":" + (inKillzone ? "true" : "false") + ",\"vwap_z\":" + str.tostring(vwapZ, "#.2") + ",\"a_plus\":" + (bearExecutionReady or bearContinuationReady ? "true" : "false") + "}"
+    alert(payload, alert.freq_once_per_bar_close)
+    lastResearchBearBar := bar_index
