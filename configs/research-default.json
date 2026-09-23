@@ -1,0 +1,29 @@
+{
+  "objective": "6R_before_stop",
+  "candidate_families": ["reversal", "continuation"],
+  "pine": {
+    "minimum_grouped_score_for_export": 45,
+    "research_requires_6R": false,
+    "execution_minimum_R": 6,
+    "mtf_votes_required_for_live_gate": 2,
+    "confirmed_pivots_only": true
+  },
+  "labeling": {
+    "stop_R": -1,
+    "checkpoint_R": [1,2,3,4,6,8,10],
+    "same_bar_stop_wins": true,
+    "horizon_bars": 100
+  },
+  "validation": {
+    "chronological_folds": 5,
+    "block_bootstrap_iterations": 5000,
+    "block_size_events": 10,
+    "minimum_labeled_rows_for_meta_model": 300,
+    "final_test_fraction": 0.2
+  },
+  "shadow": {
+    "minimum_grouped_score": 78,
+    "minimum_projected_R": 6,
+    "require_jev": true
+  }
+}
