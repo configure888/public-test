@@ -1,5 +1,5 @@
 //@version=6
-indicator("Advanced Pattern Intelligence System v3 — SMC Fusion", overlay=true, max_bars_back=1000, max_lines_count=500, max_labels_count=500, max_boxes_count=200, dynamic_requests=true)
+indicator("Advanced Pattern Intelligence System v3.1 — SMC Fusion + Jev", overlay=true, max_bars_back=1000, max_lines_count=500, max_labels_count=500, max_boxes_count=200, dynamic_requests=true)
 
 // ============================================================
 // INPUTS
@@ -71,54 +71,6 @@ explainPosition   = input.string("middle_right", "Explanation Panel", options=["
 panelTextSize     = input.string("small", "Panel Text Size", options=["tiny", "small", "normal", "large"], group=g7)
 
 
-g8 = "ICT / Institutional Engine"
-detectOB          = input.bool(true, "Order Blocks / Mitigation", group=g8)
-obLookback        = input.int(12, "Order Block Search Bars", minval=3, maxval=50, group=g8)
-obUseWicks        = input.bool(true, "Order Block Uses Candle Wicks", group=g8)
-detectOTE         = input.bool(true, "OTE 62-79% Retracement", group=g8)
-oteFibA           = input.float(0.62, "OTE Shallow Fib", minval=0.50, maxval=0.75, step=0.01, group=g8)
-oteFibB           = input.float(0.79, "OTE Deep Fib", minval=0.65, maxval=0.90, step=0.01, group=g8)
-detectSMT         = input.bool(true, "SMT Divergence", group=g8)
-smtSymbol         = input.symbol("TVC:DXY", "SMT Comparator", group=g8)
-smtTf             = input.timeframe("15", "SMT Timeframe", group=g8)
-smtPivotLen       = input.int(5, "SMT Pivot Strength", minval=2, maxval=15, group=g8)
-showOBZones       = input.bool(true, "Show Active Order Blocks", group=g8)
-showOTEZone       = input.bool(true, "Show Active OTE Zone", group=g8)
-
-g9 = "MTF / Regime / Sessions"
-useMTF            = input.bool(true, "Use 5m / 15m / 1h Alignment", group=g9)
-mtfFastLen        = input.int(20, "MTF Fast EMA", minval=5, maxval=100, group=g9)
-mtfSlowLen        = input.int(50, "MTF Slow EMA", minval=10, maxval=300, group=g9)
-mtfTf1            = input.timeframe("5", "Execution TF", group=g9)
-mtfTf2            = input.timeframe("15", "Confirmation TF", group=g9)
-mtfTf3            = input.timeframe("60", "Narrative TF", group=g9)
-useSessions       = input.bool(true, "Use NY Killzones", group=g9)
-nyAmSession       = input.session("0700-1100", "NY AM", group=g9)
-nyPmSession       = input.session("1300-1500", "NY PM", group=g9)
-adxLen            = input.int(14, "Regime ADX Length", minval=5, maxval=50, group=g9)
-adxTrendThreshold = input.float(22.0, "Trend ADX Threshold", minval=10.0, maxval=50.0, step=0.5, group=g9)
-
-g10 = "Coinlegs / Macro Context"
-useMacroFeed      = input.bool(false, "Use Macro / Coinlegs Feed", group=g10)
-macroSymbol       = input.symbol("BINANCE:BTCUSDT", "Macro / BTC Symbol", group=g10)
-macroTf           = input.timeframe("60", "Macro Timeframe", group=g10)
-macroFastLen      = input.int(20, "Macro Fast EMA", minval=5, maxval=100, group=g10)
-macroSlowLen      = input.int(50, "Macro Slow EMA", minval=10, maxval=300, group=g10)
-macroRelation     = input.string("Positive", "Relationship", options=["Positive", "Inverse"], group=g10)
-
-g11 = "Selective Setup Engine"
-minSetupScore     = input.float(72.0, "Minimum Setup Score", minval=40.0, maxval=95.0, step=1.0, group=g11)
-minProjectedRR    = input.float(6.0, "Minimum Projected R", minval=1.0, maxval=20.0, step=0.5, group=g11)
-stopBufferATR     = input.float(0.15, "Stop Buffer ATR", minval=0.0, maxval=2.0, step=0.05, group=g11)
-requireSweepRev   = input.bool(true, "Reversal Requires Liquidity Sweep", group=g11)
-showSetupPanel    = input.bool(true, "Show Institutional Setup Panel", group=g11)
-
-g12 = "Jev Decision Export"
-enableJevExport   = input.bool(false, "Export Qualified Candidates via alert()", group=g12)
-jevMinScore       = input.float(78.0, "Minimum Score for Jev", minval=50.0, maxval=99.0, step=1.0, group=g12)
-jevRequireMinRR   = input.bool(true, "Require Minimum R Before Jev", group=g12)
-
-
 g8 = "ICT / SMC Execution"
 detectExecution   = input.bool(true, "Execution Stack", group=g8)
 detectOB          = input.bool(true, "Order Blocks", group=g8)
@@ -167,6 +119,24 @@ showOTEZones       = input.bool(true, "Show OTE Zones", group=g12)
 showOBZones        = input.bool(true, "Show Order Blocks", group=g12)
 showIFVGZones      = input.bool(true, "Show IFVG Zones", group=g12)
 executionPosition  = input.string("bottom_right", "Execution Dashboard", options=["top_left", "top_center", "top_right", "middle_left", "middle_center", "middle_right", "bottom_left", "bottom_center", "bottom_right"], group=g12)
+
+
+g13 = "MTF / Coinlegs / Jev"
+useMtfMatrix       = input.bool(true, "Use 5m / 15m / 1h Matrix", group=g13)
+mtfExecTf          = input.timeframe("5", "Execution TF", group=g13)
+mtfConfirmTf       = input.timeframe("15", "Confirmation TF", group=g13)
+mtfNarrativeTf     = input.timeframe("60", "Narrative TF", group=g13)
+mtfMatrixFastLen   = input.int(20, "Matrix Fast EMA", minval=5, maxval=100, group=g13)
+mtfMatrixSlowLen   = input.int(50, "Matrix Slow EMA", minval=10, maxval=300, group=g13)
+useMacroFeed       = input.bool(false, "Use Coinlegs / Macro Feed", group=g13)
+macroSymbol        = input.symbol("BINANCE:BTCUSDT", "Coinlegs / Macro Symbol", group=g13)
+macroTf            = input.timeframe("60", "Macro TF", group=g13)
+macroFastLen       = input.int(20, "Macro Fast EMA", minval=5, maxval=100, group=g13)
+macroSlowLen       = input.int(50, "Macro Slow EMA", minval=10, maxval=300, group=g13)
+macroRelation      = input.string("Same", "Macro Relationship", options=["Same", "Inverse"], group=g13)
+enableJevExport    = input.bool(false, "Export Qualified Candidates to Jev", group=g13)
+jevMinScore        = input.float(78.0, "Jev Minimum Internal Score", minval=50.0, maxval=99.0, step=1.0, group=g13)
+jevRequireRR       = input.bool(true, "Jev Requires 6R Gate", group=g13)
 
 // ============================================================
 // TYPES
@@ -234,47 +204,6 @@ f_ratio_near(float value, float target, float tolerance) =>
 
 f_ratio_range(float value, float lo, float hi) =>
     not na(value) and value >= lo and value <= hi
-
-
-f_last_pivot_high(int len, int occurrence) =>
-    float p = ta.pivothigh(high, len, len)
-    ta.valuewhen(not na(p), p, occurrence)
-
-f_last_pivot_low(int len, int occurrence) =>
-    float p = ta.pivotlow(low, len, len)
-    ta.valuewhen(not na(p), p, occurrence)
-
-f_find_order_block(bool bullish, int lookback, bool useWicks) =>
-    float zoneTop = na
-    float zoneBottom = na
-    int zoneBar = na
-    for i = 1 to lookback
-        bool opposing = bullish ? close[i] < open[i] : close[i] > open[i]
-        if opposing and na(zoneBar)
-            zoneTop := bullish ? (useWicks ? high[i] : open[i]) : (useWicks ? high[i] : close[i])
-            zoneBottom := bullish ? (useWicks ? low[i] : close[i]) : (useWicks ? low[i] : open[i])
-            zoneBar := bar_index - i
-    [zoneTop, zoneBottom, zoneBar]
-
-f_setup_score(bool structureOk, bool liquidityOk, bool displacementOk, bool pdArrayOk, int mtfAligned, bool htfAligned, bool smtOk, bool sessionOk, bool volOk, bool regimeOk, bool macroOk) =>
-    float score = 0.0
-    score += structureOk ? 20.0 : 0.0
-    score += liquidityOk ? 18.0 : 0.0
-    score += displacementOk ? 14.0 : 0.0
-    score += pdArrayOk ? 16.0 : 0.0
-    score += math.min(mtfAligned, 3) * 4.0
-    score += htfAligned ? 6.0 : 0.0
-    score += smtOk ? 5.0 : 0.0
-    score += sessionOk ? 3.0 : 0.0
-    score += volOk ? 2.0 : 0.0
-    score += regimeOk ? 2.0 : 0.0
-    score += macroOk ? 2.0 : 0.0
-    f_clamp(score, 0.0, 99.0)
-
-f_rr(float entry, float stop, float target, bool bullish) =>
-    float risk = bullish ? entry - stop : stop - entry
-    float reward = bullish ? target - entry : entry - target
-    risk > syminfo.mintick and reward > 0 ? reward / risk : 0.0
 
 f_nearest_above(float price, float a, float b, float c, float d) =>
     float out = na
@@ -433,55 +362,6 @@ if useHTF and htfValid
 htfBull = useHTF and htfValid and not na(htfClose) and htfClose > htfFast and htfFast > htfSlow
 htfBear = useHTF and htfValid and not na(htfClose) and htfClose < htfFast and htfFast < htfSlow
 
-
-// Confirmed MTF EMA-state matrix. [1] + lookahead_on keeps HTF values confirmed.
-mtfClose1 = request.security(syminfo.tickerid, mtfTf1, close[1], lookahead=barmerge.lookahead_on)
-mtfFast1 = request.security(syminfo.tickerid, mtfTf1, ta.ema(close, mtfFastLen)[1], lookahead=barmerge.lookahead_on)
-mtfSlow1 = request.security(syminfo.tickerid, mtfTf1, ta.ema(close, mtfSlowLen)[1], lookahead=barmerge.lookahead_on)
-mtfClose2 = request.security(syminfo.tickerid, mtfTf2, close[1], lookahead=barmerge.lookahead_on)
-mtfFast2 = request.security(syminfo.tickerid, mtfTf2, ta.ema(close, mtfFastLen)[1], lookahead=barmerge.lookahead_on)
-mtfSlow2 = request.security(syminfo.tickerid, mtfTf2, ta.ema(close, mtfSlowLen)[1], lookahead=barmerge.lookahead_on)
-mtfClose3 = request.security(syminfo.tickerid, mtfTf3, close[1], lookahead=barmerge.lookahead_on)
-mtfFast3 = request.security(syminfo.tickerid, mtfTf3, ta.ema(close, mtfFastLen)[1], lookahead=barmerge.lookahead_on)
-mtfSlow3 = request.security(syminfo.tickerid, mtfTf3, ta.ema(close, mtfSlowLen)[1], lookahead=barmerge.lookahead_on)
-mtfBull1 = mtfClose1 > mtfFast1 and mtfFast1 > mtfSlow1
-mtfBull2 = mtfClose2 > mtfFast2 and mtfFast2 > mtfSlow2
-mtfBull3 = mtfClose3 > mtfFast3 and mtfFast3 > mtfSlow3
-mtfBear1 = mtfClose1 < mtfFast1 and mtfFast1 < mtfSlow1
-mtfBear2 = mtfClose2 < mtfFast2 and mtfFast2 < mtfSlow2
-mtfBear3 = mtfClose3 < mtfFast3 and mtfFast3 < mtfSlow3
-mtfBullCount = useMTF ? ((mtfBull1 ? 1 : 0) + (mtfBull2 ? 1 : 0) + (mtfBull3 ? 1 : 0)) : 0
-mtfBearCount = useMTF ? ((mtfBear1 ? 1 : 0) + (mtfBear2 ? 1 : 0) + (mtfBear3 ? 1 : 0)) : 0
-
-// Macro/Coinlegs feed can be positive (alts vs BTC) or inverse (EUR/XAU vs DXY-like feed).
-macroClose = request.security(macroSymbol, macroTf, close[1], lookahead=barmerge.lookahead_on)
-macroFast = request.security(macroSymbol, macroTf, ta.ema(close, macroFastLen)[1], lookahead=barmerge.lookahead_on)
-macroSlow = request.security(macroSymbol, macroTf, ta.ema(close, macroSlowLen)[1], lookahead=barmerge.lookahead_on)
-macroRawBull = macroClose > macroFast and macroFast > macroSlow
-macroRawBear = macroClose < macroFast and macroFast < macroSlow
-macroBullAligned = not useMacroFeed or (macroRelation == "Positive" ? macroRawBull : macroRawBear)
-macroBearAligned = not useMacroFeed or (macroRelation == "Positive" ? macroRawBear : macroRawBull)
-
-// Regime, session, VWAP and flow proxies.
-[diPlus, diMinus, adx] = ta.dmi(adxLen, adxLen)
-emaRegimeFast = ta.ema(close, mtfFastLen)
-emaRegimeSlow = ta.ema(close, mtfSlowLen)
-sessionVwap = ta.vwap(hlc3)
-vwapZ = (close - sessionVwap) / atrSafe
-barRangeSafe = math.max(high - low, syminfo.mintick)
-flowProxy = volume * (((close - low) - (high - close)) / barRangeSafe)
-flowBase = ta.sma(flowProxy, volLen)
-flowBull = flowBase > 0
-flowBear = flowBase < 0
-trendRegime = adx >= adxTrendThreshold
-bullTrendRegime = trendRegime and emaRegimeFast > emaRegimeSlow
-bearTrendRegime = trendRegime and emaRegimeFast < emaRegimeSlow
-expansionRegime = atr > ta.sma(atr, compressionLen) and bodyATR >= 0.8
-bool rangeRegime = false
-inNyAm = not na(time(timeframe.period, nyAmSession, "America/New_York"))
-inNyPm = not na(time(timeframe.period, nyPmSession, "America/New_York"))
-inKillzone = not useSessions or inNyAm or inNyPm
-
 bool midValid = timeframe.in_seconds(midTf) > timeframe.in_seconds(timeframe.period)
 float midClose = na
 float midFast = na
@@ -492,6 +372,44 @@ if midValid
     midSlow := request.security(syminfo.tickerid, midTf, ta.ema(close, midSlowLen)[1], lookahead=barmerge.lookahead_on)
 midBull = midValid and not na(midClose) and midClose > midFast and midFast > midSlow
 midBear = midValid and not na(midClose) and midClose < midFast and midFast < midSlow
+
+
+// Explicit 5m / 15m / 1h matrix. These are context votes, not standalone entries.
+mtfExecClose = request.security(syminfo.tickerid, mtfExecTf, close[1], lookahead=barmerge.lookahead_on)
+mtfExecFast = request.security(syminfo.tickerid, mtfExecTf, ta.ema(close, mtfMatrixFastLen)[1], lookahead=barmerge.lookahead_on)
+mtfExecSlow = request.security(syminfo.tickerid, mtfExecTf, ta.ema(close, mtfMatrixSlowLen)[1], lookahead=barmerge.lookahead_on)
+mtfConfirmClose = request.security(syminfo.tickerid, mtfConfirmTf, close[1], lookahead=barmerge.lookahead_on)
+mtfConfirmFast = request.security(syminfo.tickerid, mtfConfirmTf, ta.ema(close, mtfMatrixFastLen)[1], lookahead=barmerge.lookahead_on)
+mtfConfirmSlow = request.security(syminfo.tickerid, mtfConfirmTf, ta.ema(close, mtfMatrixSlowLen)[1], lookahead=barmerge.lookahead_on)
+mtfNarrativeClose = request.security(syminfo.tickerid, mtfNarrativeTf, close[1], lookahead=barmerge.lookahead_on)
+mtfNarrativeFast = request.security(syminfo.tickerid, mtfNarrativeTf, ta.ema(close, mtfMatrixFastLen)[1], lookahead=barmerge.lookahead_on)
+mtfNarrativeSlow = request.security(syminfo.tickerid, mtfNarrativeTf, ta.ema(close, mtfMatrixSlowLen)[1], lookahead=barmerge.lookahead_on)
+mtfExecBull = mtfExecClose > mtfExecFast and mtfExecFast > mtfExecSlow
+mtfExecBear = mtfExecClose < mtfExecFast and mtfExecFast < mtfExecSlow
+mtfConfirmBull = mtfConfirmClose > mtfConfirmFast and mtfConfirmFast > mtfConfirmSlow
+mtfConfirmBear = mtfConfirmClose < mtfConfirmFast and mtfConfirmFast < mtfConfirmSlow
+mtfNarrativeBull = mtfNarrativeClose > mtfNarrativeFast and mtfNarrativeFast > mtfNarrativeSlow
+mtfNarrativeBear = mtfNarrativeClose < mtfNarrativeFast and mtfNarrativeFast < mtfNarrativeSlow
+mtfBullCount = useMtfMatrix ? ((mtfExecBull ? 1 : 0) + (mtfConfirmBull ? 1 : 0) + (mtfNarrativeBull ? 1 : 0)) : 0
+mtfBearCount = useMtfMatrix ? ((mtfExecBear ? 1 : 0) + (mtfConfirmBear ? 1 : 0) + (mtfNarrativeBear ? 1 : 0)) : 0
+mtfBullAligned = not useMtfMatrix or mtfBullCount >= 2
+mtfBearAligned = not useMtfMatrix or mtfBearCount >= 2
+
+// Coinlegs / macro feed can be same-direction (alts vs BTC) or inverse (EUR/XAU vs DXY-style reference).
+macroClose = request.security(macroSymbol, macroTf, close[1], lookahead=barmerge.lookahead_on)
+macroFast = request.security(macroSymbol, macroTf, ta.ema(close, macroFastLen)[1], lookahead=barmerge.lookahead_on)
+macroSlow = request.security(macroSymbol, macroTf, ta.ema(close, macroSlowLen)[1], lookahead=barmerge.lookahead_on)
+macroRawBull = macroClose > macroFast and macroFast > macroSlow
+macroRawBear = macroClose < macroFast and macroFast < macroSlow
+macroBullAligned = not useMacroFeed or (macroRelation == "Same" ? macroRawBull : macroRawBear)
+macroBearAligned = not useMacroFeed or (macroRelation == "Same" ? macroRawBear : macroRawBull)
+
+// Candle-location volume proxy; useful as an execution-quality vote where true delta/L2 is unavailable in Pine.
+flowRange = math.max(high - low, syminfo.mintick)
+flowProxy = volume * (((close - low) - (high - close)) / flowRange)
+flowBaseline = ta.sma(flowProxy, volLen)
+flowBull = flowBaseline > 0
+flowBear = flowBaseline < 0
 
 // Confirmed pivots. The pivot is only known pivotLen bars after it occurs.
 ph = ta.pivothigh(high, pivotLen, pivotLen)
@@ -526,15 +444,6 @@ bearBOS = bearBreak and not structBull
 
 bullSweep = not na(lastLow) and low < lastLow and close > lastLow
 bearSweep = not na(lastHigh) and high > lastHigh and close < lastHigh
-
-
-// SMT divergence: compare the direction of the latest two confirmed swing extremes.
-smtLastHigh = request.security(smtSymbol, smtTf, f_last_pivot_high(smtPivotLen, 0), lookahead=barmerge.lookahead_off)
-smtPrevHigh = request.security(smtSymbol, smtTf, f_last_pivot_high(smtPivotLen, 1), lookahead=barmerge.lookahead_off)
-smtLastLow = request.security(smtSymbol, smtTf, f_last_pivot_low(smtPivotLen, 0), lookahead=barmerge.lookahead_off)
-smtPrevLow = request.security(smtSymbol, smtTf, f_last_pivot_low(smtPivotLen, 1), lookahead=barmerge.lookahead_off)
-bearSMT = detectSMT and haveStructure and lastHigh > prevHigh and not na(smtLastHigh) and not na(smtPrevHigh) and smtLastHigh <= smtPrevHigh
-bullSMT = detectSMT and haveStructure and lastLow < prevLow and not na(smtLastLow) and not na(smtPrevLow) and smtLastLow >= smtPrevLow
 
 // Liquidity pools and structural strength.
 equalHigh = not na(lastHigh) and not na(prevHigh) and math.abs(lastHigh - prevHigh) <= atrSafe * equalLiquidityATR
@@ -586,6 +495,11 @@ if not na(ph)
 
 bullDivRecent = nz(ta.barssince(bullRegDivEvent or bullHiddenDivEvent), 100000) <= divMemory
 bearDivRecent = nz(ta.barssince(bearRegDivEvent or bearHiddenDivEvent), 100000) <= divMemory
+
+bullRegDivRecent = nz(ta.barssince(bullRegDivEvent), 100000) <= divMemory
+bearRegDivRecent = nz(ta.barssince(bearRegDivEvent), 100000) <= divMemory
+bullHiddenDivRecent = nz(ta.barssince(bullHiddenDivEvent), 100000) <= divMemory
+bearHiddenDivRecent = nz(ta.barssince(bearHiddenDivEvent), 100000) <= divMemory
 
 // SMT divergence against two user-selected references.
 chartBreakHigh = high > ta.highest(high, smtLookback)[1]
@@ -662,56 +576,6 @@ bearFvgRecent = bearFvgAge <= fvgMemory
 bullFvgRetrace = not na(bullFvgTop) and not na(bullFvgBar) and bar_index > bullFvgBar and low <= bullFvgTop and high >= bullFvgBottom
 bearFvgRetrace = not na(bearFvgTop) and not na(bearFvgBar) and bar_index > bearFvgBar and high >= bearFvgBottom and low <= bearFvgTop
 
-
-// Order blocks: last opposing candle before structural displacement.
-[bullObCandidateTop, bullObCandidateBottom, bullObCandidateBar] = f_find_order_block(true, obLookback, obUseWicks)
-[bearObCandidateTop, bearObCandidateBottom, bearObCandidateBar] = f_find_order_block(false, obLookback, obUseWicks)
-bullObTrigger = detectOB and bullDisplacement and (bullCHOCH or bullBOS)
-bearObTrigger = detectOB and bearDisplacement and (bearCHOCH or bearBOS)
-
-var float bullObTop = na
-var float bullObBottom = na
-var int bullObBar = na
-var float bearObTop = na
-var float bearObBottom = na
-var int bearObBar = na
-
-if bullObTrigger and not na(bullObCandidateBar)
-    bullObTop := bullObCandidateTop
-    bullObBottom := bullObCandidateBottom
-    bullObBar := bullObCandidateBar
-if bearObTrigger and not na(bearObCandidateBar)
-    bearObTop := bearObCandidateTop
-    bearObBottom := bearObCandidateBottom
-    bearObBar := bearObCandidateBar
-
-bullObMitigation = not na(bullObBar) and bar_index > bullObBar and low <= bullObTop and high >= bullObBottom and close > bullObBottom
-bearObMitigation = not na(bearObBar) and bar_index > bearObBar and high >= bearObBottom and low <= bearObTop and close < bearObTop
-bullObInvalid = not na(bullObBottom) and close < bullObBottom
-bearObInvalid = not na(bearObTop) and close > bearObTop
-
-if bullObInvalid
-    bullObTop := na
-    bullObBottom := na
-    bullObBar := na
-if bearObInvalid
-    bearObTop := na
-    bearObBottom := na
-    bearObBar := na
-
-// OTE from the latest confirmed impulse swing.
-bullImpulseValid = detectOTE and not na(lastHigh) and not na(lastLow) and lastHighBar > lastLowBar and lastHigh > lastLow
-bearImpulseValid = detectOTE and not na(lastHigh) and not na(lastLow) and lastLowBar > lastHighBar and lastHigh > lastLow
-dealingRange = not na(lastHigh) and not na(lastLow) ? lastHigh - lastLow : na
-bullOteTop = bullImpulseValid ? lastHigh - dealingRange * oteFibA : na
-bullOteBottom = bullImpulseValid ? lastHigh - dealingRange * oteFibB : na
-bearOteTop = bearImpulseValid ? lastLow + dealingRange * oteFibB : na
-bearOteBottom = bearImpulseValid ? lastLow + dealingRange * oteFibA : na
-bullOteTouch = bullImpulseValid and low <= bullOteTop and high >= bullOteBottom
-bearOteTouch = bearImpulseValid and high >= bearOteBottom and low <= bearOteTop
-discount = not na(dealingRange) and dealingRange > 0 ? close <= (lastHigh + lastLow) / 2.0 : false
-premium = not na(dealingRange) and dealingRange > 0 ? close >= (lastHigh + lastLow) / 2.0 : false
-
 bullIfvgRetrace = not na(bullIfvgTop) and not na(bullIfvgBar) and bar_index > bullIfvgBar and low <= bullIfvgTop and high >= bullIfvgBottom
 bearIfvgRetrace = not na(bearIfvgTop) and not na(bearIfvgBar) and bar_index > bearIfvgBar and high >= bearIfvgBottom and low <= bearIfvgTop
 
@@ -775,7 +639,6 @@ atrMean = ta.sma(atr, compressionLen)
 priorAtrMean = atrMean[compressionLen]
 atrCompression = not na(priorAtrMean) and priorAtrMean > 0 ? atrMean / priorAtrMean : 1.0
 coilActive = rangeCompression <= compressionRatio and atrCompression < 1.0
-rangeRegime := not trendRegime and not coilActive
 
 // Recent event ages for sequence logic.
 bullSweepAge = nz(ta.barssince(bullSweep), 100000)
@@ -785,56 +648,6 @@ bearChochAge = nz(ta.barssince(bearCHOCH), 100000)
 bullDispAge = nz(ta.barssince(bullDisplacement), 100000)
 bearDispAge = nz(ta.barssince(bearDisplacement), 100000)
 coilAge = nz(ta.barssince(coilActive), 100000)
-
-
-// Ordered event timestamps for institutional lifecycle validation.
-bullSweepBarEvent = nz(ta.valuewhen(bullSweep, bar_index, 0), -100000)
-bearSweepBarEvent = nz(ta.valuewhen(bearSweep, bar_index, 0), -100000)
-bullSmtBarEvent = nz(ta.valuewhen(bullSMT, bar_index, 0), -100000)
-bearSmtBarEvent = nz(ta.valuewhen(bearSMT, bar_index, 0), -100000)
-bullChochBarEvent = nz(ta.valuewhen(bullCHOCH, bar_index, 0), -100000)
-bearChochBarEvent = nz(ta.valuewhen(bearCHOCH, bar_index, 0), -100000)
-bullBosBarEvent = nz(ta.valuewhen(bullBOS, bar_index, 0), -100000)
-bearBosBarEvent = nz(ta.valuewhen(bearBOS, bar_index, 0), -100000)
-bullDispBarEvent = nz(ta.valuewhen(bullDisplacement, bar_index, 0), -100000)
-bearDispBarEvent = nz(ta.valuewhen(bearDisplacement, bar_index, 0), -100000)
-bullFvgBarEvent = nz(ta.valuewhen(bullFvgEvent, bar_index, 0), -100000)
-bearFvgBarEvent = nz(ta.valuewhen(bearFvgEvent, bar_index, 0), -100000)
-
-bullLiquidityRecent = bullSweepAge <= sequenceWindow or (bar_index - bullSmtBarEvent <= sequenceWindow)
-bearLiquidityRecent = bearSweepAge <= sequenceWindow or (bar_index - bearSmtBarEvent <= sequenceWindow)
-bullReversalOrdered = bullChochBarEvent >= bullSweepBarEvent and bullDispBarEvent >= bullChochBarEvent and bullFvgBarEvent >= bullChochBarEvent and bar_index - bullSweepBarEvent <= sequenceWindow
-bearReversalOrdered = bearChochBarEvent >= bearSweepBarEvent and bearDispBarEvent >= bearChochBarEvent and bearFvgBarEvent >= bearChochBarEvent and bar_index - bearSweepBarEvent <= sequenceWindow
-bullContinuationOrdered = bullBosBarEvent >= bar_index - sequenceWindow and bullDispBarEvent >= bullBosBarEvent and (coilAge <= sequenceWindow or rangeCompression < 0.85)
-bearContinuationOrdered = bearBosBarEvent >= bar_index - sequenceWindow and bearDispBarEvent >= bearBosBarEvent and (coilAge <= sequenceWindow or rangeCompression < 0.85)
-
-bullPdArray = bullFvgRetrace or bullObMitigation or bullOteTouch
-bearPdArray = bearFvgRetrace or bearObMitigation or bearOteTouch
-bullMtfOk = not useMTF or mtfBullCount >= 2
-bearMtfOk = not useMTF or mtfBearCount >= 2
-bullRegimeOk = bullTrendRegime or expansionRegime or coilActive
-bearRegimeOk = bearTrendRegime or expansionRegime or coilActive
-
-bullReversalScore = f_setup_score(bullReversalOrdered, bullLiquidityRecent, bullDispAge <= sequenceWindow, bullPdArray, mtfBullCount, htfBull, bullSMT or bar_index - bullSmtBarEvent <= sequenceWindow, inKillzone, volConfirmed or flowBull, bullRegimeOk, macroBullAligned)
-bearReversalScore = f_setup_score(bearReversalOrdered, bearLiquidityRecent, bearDispAge <= sequenceWindow, bearPdArray, mtfBearCount, htfBear, bearSMT or bar_index - bearSmtBarEvent <= sequenceWindow, inKillzone, volConfirmed or flowBear, bearRegimeOk, macroBearAligned)
-bullContinuationScore = f_setup_score(bullContinuationOrdered, bullSweepAge <= sequenceWindow or bullSMT, bullDispAge <= sequenceWindow, bullPdArray, mtfBullCount, htfBull, bullSMT, inKillzone, volConfirmed or flowBull, bullRegimeOk, macroBullAligned)
-bearContinuationScore = f_setup_score(bearContinuationOrdered, bearSweepAge <= sequenceWindow or bearSMT, bearDispAge <= sequenceWindow, bearPdArray, mtfBearCount, htfBear, bearSMT, inKillzone, volConfirmed or flowBear, bearRegimeOk, macroBearAligned)
-
-bullEntry = close
-bearEntry = close
-bullStopBase = not na(bullObBottom) ? math.min(nz(lastLow, bullObBottom), bullObBottom) : nz(lastLow, close - atrSafe)
-bearStopBase = not na(bearObTop) ? math.max(nz(lastHigh, bearObTop), bearObTop) : nz(lastHigh, close + atrSafe)
-bullStop = bullStopBase - atrSafe * stopBufferATR
-bearStop = bearStopBase + atrSafe * stopBufferATR
-bullTarget = not na(lastHigh) and lastHigh > close ? lastHigh : compressionHigh + recentRange
-bearTarget = not na(lastLow) and lastLow < close ? lastLow : compressionLow - recentRange
-bullProjectedRR = f_rr(bullEntry, bullStop, bullTarget, true)
-bearProjectedRR = f_rr(bearEntry, bearStop, bearTarget, false)
-
-bullRevReady = bullReversalScore >= minSetupScore and bullProjectedRR >= minProjectedRR and bullPdArray and bullMtfOk and (not requireSweepRev or bullSweepAge <= sequenceWindow)
-bearRevReady = bearReversalScore >= minSetupScore and bearProjectedRR >= minProjectedRR and bearPdArray and bearMtfOk and (not requireSweepRev or bearSweepAge <= sequenceWindow)
-bullContReady = bullContinuationScore >= minSetupScore and bullProjectedRR >= minProjectedRR and bullPdArray and bullMtfOk
-bearContReady = bearContinuationScore >= minSetupScore and bearProjectedRR >= minProjectedRR and bearPdArray and bearMtfOk
 
 bullSweepEventBar = ta.valuewhen(bullSweep, bar_index, 0)
 bearSweepEventBar = ta.valuewhen(bearSweep, bar_index, 0)
@@ -903,8 +716,60 @@ bearSetupScore += bearRRPass ? 8.0 : 0.0
 bearSetupScore += bearOrdered ? 10.0 : 0.0
 bearSetupScore := f_clamp(bearSetupScore, 0.0, 99.0)
 
-bullExecutionReady = detectExecution and bullSetupScore >= minExecutionScore and bullOrdered and bullEntryTouch and (na(bullRR) or bullRRPass)
-bearExecutionReady = detectExecution and bearSetupScore >= minExecutionScore and bearOrdered and bearEntryTouch and (na(bearRR) or bearRRPass)
+// Corpus-level context votes refine, but never replace, the deterministic ICT lifecycle.
+bullSetupScore += useMtfMatrix ? mtfBullCount * 2.0 : 0.0
+bearSetupScore += useMtfMatrix ? mtfBearCount * 2.0 : 0.0
+bullSetupScore += macroBullAligned ? 2.0 : 0.0
+bearSetupScore += macroBearAligned ? 2.0 : 0.0
+bullSetupScore += flowBull ? 2.0 : 0.0
+bearSetupScore += flowBear ? 2.0 : 0.0
+bullSetupScore := f_clamp(bullSetupScore, 0.0, 99.0)
+bearSetupScore := f_clamp(bearSetupScore, 0.0, 99.0)
+
+// Continuation lifecycle: HTF/MTF trend + BOS + coil/pullback + PD-array re-entry.
+// Hidden divergence is rewarded here; regular divergence remains primarily reversal evidence.
+bullBosAge = nz(ta.barssince(bullBOS), 100000)
+bearBosAge = nz(ta.barssince(bearBOS), 100000)
+bullBosEventBar = ta.valuewhen(bullBOS, bar_index, 0)
+bearBosEventBar = ta.valuewhen(bearBOS, bar_index, 0)
+bullContinuationOrdered = not na(bullBosEventBar) and not na(bullDispEventBar) and not na(bullFvgEventBar) and bullBosEventBar <= bullDispEventBar and bullDispEventBar <= bullFvgEventBar and bar_index - bullBosEventBar <= sequenceWindow
+bearContinuationOrdered = not na(bearBosEventBar) and not na(bearDispEventBar) and not na(bearFvgEventBar) and bearBosEventBar <= bearDispEventBar and bearDispEventBar <= bearFvgEventBar and bar_index - bearBosEventBar <= sequenceWindow
+bullContinuationContext = structBull and bullNarrative and mtfBullAligned and macroBullAligned and (coilAge <= sequenceWindow or rangeCompression < 0.85)
+bearContinuationContext = structBear and bearNarrative and mtfBearAligned and macroBearAligned and (coilAge <= sequenceWindow or rangeCompression < 0.85)
+
+bullContinuationScore = 0.0
+bullContinuationScore += bullContinuationContext ? 22.0 : 0.0
+bullContinuationScore += bullBosAge <= sequenceWindow ? 14.0 : 0.0
+bullContinuationScore += bullDispAge <= sequenceWindow ? 12.0 : 0.0
+bullContinuationScore += bullFvgRecent or bullIfvgRetrace ? 10.0 : 0.0
+bullContinuationScore += bullEntryTouch ? 14.0 : 0.0
+bullContinuationScore += bullHiddenDivRecent ? 8.0 : 0.0
+bullContinuationScore += bullSmtRecent ? 5.0 : 0.0
+bullContinuationScore += flowBull ? 3.0 : 0.0
+bullContinuationScore += volConfirmed ? 3.0 : 0.0
+bullContinuationScore += inKillzone ? 3.0 : 0.0
+bullContinuationScore += bullRRPass ? 6.0 : 0.0
+bullContinuationScore := f_clamp(bullContinuationScore, 0.0, 99.0)
+
+bearContinuationScore = 0.0
+bearContinuationScore += bearContinuationContext ? 22.0 : 0.0
+bearContinuationScore += bearBosAge <= sequenceWindow ? 14.0 : 0.0
+bearContinuationScore += bearDispAge <= sequenceWindow ? 12.0 : 0.0
+bearContinuationScore += bearFvgRecent or bearIfvgRetrace ? 10.0 : 0.0
+bearContinuationScore += bearEntryTouch ? 14.0 : 0.0
+bearContinuationScore += bearHiddenDivRecent ? 8.0 : 0.0
+bearContinuationScore += bearSmtRecent ? 5.0 : 0.0
+bearContinuationScore += flowBear ? 3.0 : 0.0
+bearContinuationScore += volConfirmed ? 3.0 : 0.0
+bearContinuationScore += inKillzone ? 3.0 : 0.0
+bearContinuationScore += bearRRPass ? 6.0 : 0.0
+bearContinuationScore := f_clamp(bearContinuationScore, 0.0, 99.0)
+
+bullContinuationReady = detectExecution and bullContinuationScore >= minExecutionScore and bullContinuationOrdered and bullContinuationContext and bullEntryTouch and (na(bullRR) or bullRRPass)
+bearContinuationReady = detectExecution and bearContinuationScore >= minExecutionScore and bearContinuationOrdered and bearContinuationContext and bearEntryTouch and (na(bearRR) or bearRRPass)
+
+bullExecutionReady = detectExecution and bullSetupScore >= minExecutionScore and bullOrdered and bullEntryTouch and mtfBullAligned and macroBullAligned and (na(bullRR) or bullRRPass)
+bearExecutionReady = detectExecution and bearSetupScore >= minExecutionScore and bearOrdered and bearEntryTouch and mtfBearAligned and macroBearAligned and (na(bearRR) or bearRRPass)
 
 // ============================================================
 // DETECTORS
@@ -1244,37 +1109,6 @@ if detectHarmonics
 if detectCandles
     f_add_pattern(patterns, f_detect_candle())
 
-
-if detectSMT and bullSMT
-    f_add_pattern(patterns, PatternInfo.new("Bullish SMT Divergence", "bullish", 72.0, "Confirmed", nz(lastLowBar, bar_index), bar_index, lastLow, low, na, "Chart made a lower low while comparator failed to confirm\nPotential sell-side exhaustion"))
-if detectSMT and bearSMT
-    f_add_pattern(patterns, PatternInfo.new("Bearish SMT Divergence", "bearish", 72.0, "Confirmed", nz(lastHighBar, bar_index), bar_index, high, lastHigh, na, "Chart made a higher high while comparator failed to confirm\nPotential buy-side exhaustion"))
-
-if detectOB and bullObMitigation
-    f_add_pattern(patterns, PatternInfo.new("Bullish Order Block Mitigation", "bullish", 74.0, "Entry Zone", nz(bullObBar, bar_index), bar_index, bullObTop, bullObBottom, bullTarget, "Opposing candle originated structural displacement\nPrice revisited active demand block"))
-if detectOB and bearObMitigation
-    f_add_pattern(patterns, PatternInfo.new("Bearish Order Block Mitigation", "bearish", 74.0, "Entry Zone", nz(bearObBar, bar_index), bar_index, bearObTop, bearObBottom, bearTarget, "Opposing candle originated structural displacement\nPrice revisited active supply block"))
-
-if detectOTE and bullOteTouch
-    f_add_pattern(patterns, PatternInfo.new("Bullish OTE", "bullish", 68.0, discount ? "Discount Entry" : "Retrace", nz(lastLowBar, bar_index), bar_index, bullOteTop, bullOteBottom, bullTarget, "62-79% retracement of latest confirmed bullish dealing range"))
-if detectOTE and bearOteTouch
-    f_add_pattern(patterns, PatternInfo.new("Bearish OTE", "bearish", 68.0, premium ? "Premium Entry" : "Retrace", nz(lastHighBar, bar_index), bar_index, bearOteTop, bearOteBottom, bearTarget, "62-79% retracement of latest confirmed bearish dealing range"))
-
-if bullReversalScore >= minSetupScore - 10
-    string stage = bullRevReady ? "A+ READY" : bullPdArray ? "Entry Pending" : "Developing"
-    string reason = "REV " + str.tostring(bullReversalScore, "#") + " | R " + str.tostring(bullProjectedRR, "#.1") + "\nSweep " + (bullSweepAge <= sequenceWindow ? "Y" : "N") + " SMT " + (bullSMT or bar_index - bullSmtBarEvent <= sequenceWindow ? "Y" : "N") + " CHOCH " + (bullChochAge <= sequenceWindow ? "Y" : "N") + "\nPD " + (bullPdArray ? "Y" : "N") + " MTF " + str.tostring(mtfBullCount) + "/3 KZ " + (inKillzone ? "Y" : "N")
-    f_add_pattern(patterns, PatternInfo.new("Institutional Reversal Long", "bullish", bullReversalScore, stage, bar_index - sequenceWindow, bar_index, bullEntry, bullStop, bullTarget, reason))
-if bearReversalScore >= minSetupScore - 10
-    string stage = bearRevReady ? "A+ READY" : bearPdArray ? "Entry Pending" : "Developing"
-    string reason = "REV " + str.tostring(bearReversalScore, "#") + " | R " + str.tostring(bearProjectedRR, "#.1") + "\nSweep " + (bearSweepAge <= sequenceWindow ? "Y" : "N") + " SMT " + (bearSMT or bar_index - bearSmtBarEvent <= sequenceWindow ? "Y" : "N") + " CHOCH " + (bearChochAge <= sequenceWindow ? "Y" : "N") + "\nPD " + (bearPdArray ? "Y" : "N") + " MTF " + str.tostring(mtfBearCount) + "/3 KZ " + (inKillzone ? "Y" : "N")
-    f_add_pattern(patterns, PatternInfo.new("Institutional Reversal Short", "bearish", bearReversalScore, stage, bar_index - sequenceWindow, bar_index, bearStop, bearEntry, bearTarget, reason))
-if bullContinuationScore >= minSetupScore - 10
-    string stage = bullContReady ? "A+ READY" : bullPdArray ? "Entry Pending" : "Developing"
-    f_add_pattern(patterns, PatternInfo.new("HTF Coil Continuation Long", "bullish", bullContinuationScore, stage, bar_index - sequenceWindow, bar_index, bullEntry, bullStop, bullTarget, "CONT " + str.tostring(bullContinuationScore, "#") + " | R " + str.tostring(bullProjectedRR, "#.1") + "\nBOS/coil + PD-array re-entry\nMTF " + str.tostring(mtfBullCount) + "/3 Macro " + (macroBullAligned ? "Y" : "N")))
-if bearContinuationScore >= minSetupScore - 10
-    string stage = bearContReady ? "A+ READY" : bearPdArray ? "Entry Pending" : "Developing"
-    f_add_pattern(patterns, PatternInfo.new("HTF Coil Continuation Short", "bearish", bearContinuationScore, stage, bar_index - sequenceWindow, bar_index, bearStop, bearEntry, bearTarget, "CONT " + str.tostring(bearContinuationScore, "#") + " | R " + str.tostring(bearProjectedRR, "#.1") + "\nBOS/coil + PD-array re-entry\nMTF " + str.tostring(mtfBearCount) + "/3 Macro " + (macroBearAligned ? "Y" : "N")))
-
 if detectLiquidity and bullSweep
     float sc = f_score(52.0, 0.80, true, true, bullFvgRecent, bullDisplacement, htfBull, volConfirmed)
     f_add_pattern(patterns, PatternInfo.new("Sell-side Liquidity Sweep", "bullish", sc, "Confirmed", nz(lastLowBar, bar_index), bar_index, lastLow, low, na, "Low traded below confirmed swing low\nClose reclaimed the liquidity level"))
@@ -1336,6 +1170,16 @@ if bearExecutionReady
     string evidence = "ORDERED Sweep > MSS > Disp > FVG\nEntry PD array: " + (bearOteEntry ? "OTE " : "") + (bearFvgRetrace ? "FVG " : "") + (bearIfvgRetrace ? "IFVG " : "") + (bearObRetrace ? "OB" : "") + "\nSMT " + (bearSmtRecent ? "Y" : "N") + " | RSI div " + (bearDivRecent ? "Y" : "N") + " | KZ " + (inKillzone ? "Y" : "N") + "\nDOL RR " + rrTxt
     f_add_pattern(patterns, PatternInfo.new("Bearish ICT Execution Stack", "bearish", bearSetupScore, "ENTRY ZONE", nz(bearSweepEventBar, bar_index), bar_index, bearStop, bearEntry, bearDOL, evidence))
 
+
+if bullContinuationReady
+    string rrTxt = na(bullRR) ? "n/a" : str.tostring(bullRR, "#.1") + "R"
+    string evidence = "CONTINUATION BOS > Disp > FVG\nCoil/pullback + PD-array re-entry\nHidden div " + (bullHiddenDivRecent ? "Y" : "N") + " | SMT " + (bullSmtRecent ? "Y" : "N") + "\nMTF " + str.tostring(mtfBullCount) + "/3 | DOL " + rrTxt
+    f_add_pattern(patterns, PatternInfo.new("Bullish HTF Coil Continuation", "bullish", bullContinuationScore, "ENTRY ZONE", nz(bullBosEventBar, bar_index), bar_index, bullEntry, bullStop, bullDOL, evidence))
+if bearContinuationReady
+    string rrTxt = na(bearRR) ? "n/a" : str.tostring(bearRR, "#.1") + "R"
+    string evidence = "CONTINUATION BOS > Disp > FVG\nCoil/pullback + PD-array re-entry\nHidden div " + (bearHiddenDivRecent ? "Y" : "N") + " | SMT " + (bearSmtRecent ? "Y" : "N") + "\nMTF " + str.tostring(mtfBearCount) + "/3 | DOL " + rrTxt
+    f_add_pattern(patterns, PatternInfo.new("Bearish HTF Coil Continuation", "bearish", bearContinuationScore, "ENTRY ZONE", nz(bearBosEventBar, bar_index), bar_index, bearStop, bearEntry, bearDOL, evidence))
+
 f_sort_patterns(patterns)
 
 // ============================================================
@@ -1353,27 +1197,6 @@ fill(bullFvgTopPlot, bullFvgBotPlot, color=color.new(color.lime, 92))
 bearFvgTopPlot = plot(showFVGZones ? bearFvgTop : na, "Bear FVG Top", color=color.new(color.red, 80), style=plot.style_linebr)
 bearFvgBotPlot = plot(showFVGZones ? bearFvgBottom : na, "Bear FVG Bottom", color=color.new(color.red, 80), style=plot.style_linebr)
 fill(bearFvgTopPlot, bearFvgBotPlot, color=color.new(color.red, 92))
-
-
-// Institutional PD arrays.
-bullObTopPlot = plot(showOBZones ? bullObTop : na, "Bull OB Top", color=color.new(color.teal, 68), style=plot.style_linebr)
-bullObBotPlot = plot(showOBZones ? bullObBottom : na, "Bull OB Bottom", color=color.new(color.teal, 68), style=plot.style_linebr)
-fill(bullObTopPlot, bullObBotPlot, color=color.new(color.teal, 91))
-bearObTopPlot = plot(showOBZones ? bearObTop : na, "Bear OB Top", color=color.new(color.maroon, 68), style=plot.style_linebr)
-bearObBotPlot = plot(showOBZones ? bearObBottom : na, "Bear OB Bottom", color=color.new(color.maroon, 68), style=plot.style_linebr)
-fill(bearObTopPlot, bearObBotPlot, color=color.new(color.maroon, 91))
-bullOteTopPlot = plot(showOTEZone ? bullOteTop : na, "Bull OTE 62", color=color.new(color.aqua, 75), style=plot.style_linebr)
-bullOteBotPlot = plot(showOTEZone ? bullOteBottom : na, "Bull OTE 79", color=color.new(color.aqua, 75), style=plot.style_linebr)
-fill(bullOteTopPlot, bullOteBotPlot, color=color.new(color.aqua, 94))
-bearOteTopPlot = plot(showOTEZone ? bearOteTop : na, "Bear OTE 79", color=color.new(color.orange, 75), style=plot.style_linebr)
-bearOteBotPlot = plot(showOTEZone ? bearOteBottom : na, "Bear OTE 62", color=color.new(color.orange, 75), style=plot.style_linebr)
-fill(bearOteTopPlot, bearOteBotPlot, color=color.new(color.orange, 94))
-
-plot(bullReversalScore, "Bull Reversal Score", display=display.data_window)
-plot(bearReversalScore, "Bear Reversal Score", display=display.data_window)
-plot(bullProjectedRR, "Bull Projected R", display=display.data_window)
-plot(bearProjectedRR, "Bear Projected R", display=display.data_window)
-plot(vwapZ, "VWAP Z (ATR)", display=display.data_window)
 
 bullObTopPlot = plot(showOBZones ? bullObTop : na, "Bull OB Top", color=color.new(color.teal, 72), style=plot.style_linebr)
 bullObBotPlot = plot(showOBZones ? bullObBottom : na, "Bull OB Bottom", color=color.new(color.teal, 72), style=plot.style_linebr)
@@ -1401,6 +1224,16 @@ plot(showDOL ? pdl : na, "Previous Day Low", color=color.new(color.yellow, 65), 
 plot(showDOL ? pwh : na, "Previous Week High", color=color.new(color.blue, 70), linewidth=1, style=plot.style_stepline)
 plot(showDOL ? pwl : na, "Previous Week Low", color=color.new(color.blue, 70), linewidth=1, style=plot.style_stepline)
 plot(showOTEZones ? dealingMid : na, "Dealing Range EQ", color=color.new(color.gray, 85), linewidth=1, style=plot.style_linebr)
+
+plot(bullSetupScore, "Bull Reversal Score", display=display.data_window)
+plot(bearSetupScore, "Bear Reversal Score", display=display.data_window)
+plot(bullContinuationScore, "Bull Continuation Score", display=display.data_window)
+plot(bearContinuationScore, "Bear Continuation Score", display=display.data_window)
+plot(bullRR, "Bull DOL R", display=display.data_window)
+plot(bearRR, "Bear DOL R", display=display.data_window)
+plot(float(mtfBullCount), "MTF Bull Votes", display=display.data_window)
+plot(float(mtfBearCount), "MTF Bear Votes", display=display.data_window)
+plot(flowBaseline, "Flow Proxy", display=display.data_window)
 
 var array<line> drawLines = array.new<line>()
 var array<label> drawLabels = array.new<label>()
@@ -1434,7 +1267,6 @@ if barstate.islast
 // ============================================================
 var table matrix = na
 var table explain = na
-var table setupPanel = na
 var table execution = na
 
 if barstate.isfirst
@@ -1442,10 +1274,8 @@ if barstate.isfirst
         matrix := table.new(f_pos(tablePosition), 4, maxPatterns + 1, bgcolor=color.new(color.black, panelTransparency), border_width=1)
     if showExplanation
         explain := table.new(f_pos(explainPosition), 2, maxPatterns + 1, bgcolor=color.new(color.black, panelTransparency), border_width=1)
-    if showSetupPanel
-        setupPanel := table.new(position.bottom_center, 6, 4, bgcolor=color.new(color.black, panelTransparency), border_width=1)
     if showExecutionPanel
-        execution := table.new(f_pos(executionPosition), 2, 9, bgcolor=color.new(color.black, panelTransparency), border_width=1)
+        execution := table.new(f_pos(executionPosition), 2, 12, bgcolor=color.new(color.black, panelTransparency), border_width=1)
 
 if barstate.islast
     string textSize = f_size(panelTextSize)
@@ -1518,35 +1348,12 @@ if barstate.islast
         table.cell(execution, 1, 7, str.tostring(vwapZ, "#.2") + " | " + sess, text_color=color.white, text_size=textSize)
         table.cell(execution, 0, 8, "Liquidity", text_color=color.silver, text_size=textSize)
         table.cell(execution, 1, 8, equalHigh ? "EQH / BSL" : equalLow ? "EQL / SSL" : weakHigh ? "Weak High" : weakLow ? "Weak Low" : "Balanced", text_color=color.white, text_size=textSize)
-
-
-// Institutional decision panel.
-if barstate.islast and showSetupPanel and not na(setupPanel)
-    string regimeText = coilActive ? "COIL" : expansionRegime ? "EXPANSION" : bullTrendRegime ? "BULL TREND" : bearTrendRegime ? "BEAR TREND" : "RANGE"
-    table.cell(setupPanel, 0, 0, "Engine", bgcolor=color.new(color.blue, 20), text_color=color.white)
-    table.cell(setupPanel, 1, 0, "Score", bgcolor=color.new(color.blue, 20), text_color=color.white)
-    table.cell(setupPanel, 2, 0, "R", bgcolor=color.new(color.blue, 20), text_color=color.white)
-    table.cell(setupPanel, 3, 0, "MTF", bgcolor=color.new(color.blue, 20), text_color=color.white)
-    table.cell(setupPanel, 4, 0, "PD", bgcolor=color.new(color.blue, 20), text_color=color.white)
-    table.cell(setupPanel, 5, 0, "State", bgcolor=color.new(color.blue, 20), text_color=color.white)
-    table.cell(setupPanel, 0, 1, "REV LONG", text_color=color.lime)
-    table.cell(setupPanel, 1, 1, str.tostring(bullReversalScore, "#"))
-    table.cell(setupPanel, 2, 1, str.tostring(bullProjectedRR, "#.1"))
-    table.cell(setupPanel, 3, 1, str.tostring(mtfBullCount) + "/3")
-    table.cell(setupPanel, 4, 1, bullPdArray ? "Y" : "N")
-    table.cell(setupPanel, 5, 1, bullRevReady ? "A+ READY" : "WATCH")
-    table.cell(setupPanel, 0, 2, "REV SHORT", text_color=color.red)
-    table.cell(setupPanel, 1, 2, str.tostring(bearReversalScore, "#"))
-    table.cell(setupPanel, 2, 2, str.tostring(bearProjectedRR, "#.1"))
-    table.cell(setupPanel, 3, 2, str.tostring(mtfBearCount) + "/3")
-    table.cell(setupPanel, 4, 2, bearPdArray ? "Y" : "N")
-    table.cell(setupPanel, 5, 2, bearRevReady ? "A+ READY" : "WATCH")
-    table.cell(setupPanel, 0, 3, regimeText, text_color=color.aqua)
-    table.cell(setupPanel, 1, 3, "SMT " + (bullSMT ? "B+" : bearSMT ? "S+" : "-"))
-    table.cell(setupPanel, 2, 3, "VWAP " + str.tostring(vwapZ, "#.1"))
-    table.cell(setupPanel, 3, 3, inKillzone ? "KZ" : "OFF")
-    table.cell(setupPanel, 4, 3, macroBullAligned and macroBearAligned ? "-" : useMacroFeed ? "MACRO" : "OFF")
-    table.cell(setupPanel, 5, 3, "JEV " + (enableJevExport ? "ARMED" : "OFF"))
+        table.cell(execution, 0, 9, "5/15/60", text_color=color.silver, text_size=textSize)
+        table.cell(execution, 1, 9, "B " + str.tostring(mtfBullCount) + " / S " + str.tostring(mtfBearCount), text_color=mtfBullCount > mtfBearCount ? color.lime : mtfBearCount > mtfBullCount ? color.red : color.white, text_size=textSize)
+        table.cell(execution, 0, 10, "Coinlegs", text_color=color.silver, text_size=textSize)
+        table.cell(execution, 1, 10, not useMacroFeed ? "OFF" : macroRawBull ? "UP" : macroRawBear ? "DOWN" : "MIXED", text_color=color.white, text_size=textSize)
+        table.cell(execution, 0, 11, "Jev Gate", text_color=color.silver, text_size=textSize)
+        table.cell(execution, 1, 11, enableJevExport ? "ARMED" : "OFF", text_color=enableJevExport ? color.aqua : color.gray, text_size=textSize)
 
 // ============================================================
 // BACKGROUND + ALERTS
@@ -1584,28 +1391,31 @@ alertcondition(bullCHOCH, "Bullish CHOCH", "Bullish change of character confirme
 alertcondition(bearCHOCH, "Bearish CHOCH", "Bearish change of character confirmed")
 alertcondition(bullSweep, "Sell-side Liquidity Sweep", "Sell-side liquidity swept and reclaimed")
 alertcondition(bearSweep, "Buy-side Liquidity Sweep", "Buy-side liquidity swept and rejected")
-
-// Jev export: Pine generates deterministic candidates; the external service can perform a typed
-// Choice/Score adjudication using this compact state vector before any execution layer acts.
-jevBullQualified = enableJevExport and math.max(bullReversalScore, bullContinuationScore) >= jevMinScore and (not jevRequireMinRR or bullProjectedRR >= minProjectedRR) and (bullRevReady or bullContReady)
-jevBearQualified = enableJevExport and math.max(bearReversalScore, bearContinuationScore) >= jevMinScore and (not jevRequireMinRR or bearProjectedRR >= minProjectedRR) and (bearRevReady or bearContReady)
-var int lastJevBullBar = na
-var int lastJevBearBar = na
-if barstate.isconfirmed and jevBullQualified and nz(lastJevBullBar, -1) != bar_index
-    string payload = "{\"type\":\"jev_candidate\",\"symbol\":\"" + syminfo.tickerid + "\",\"tf\":\"" + timeframe.period + "\",\"side\":\"long\",\"score\":" + str.tostring(math.max(bullReversalScore, bullContinuationScore), "#.0") + ",\"rr\":" + str.tostring(bullProjectedRR, "#.2") + ",\"entry\":" + str.tostring(bullEntry, format.mintick) + ",\"stop\":" + str.tostring(bullStop, format.mintick) + ",\"target\":" + str.tostring(bullTarget, format.mintick) + ",\"mtf\":" + str.tostring(mtfBullCount) + ",\"sweep\":" + (bullSweepAge <= sequenceWindow ? "true" : "false") + ",\"smt\":" + (bullSMT or bar_index - bullSmtBarEvent <= sequenceWindow ? "true" : "false") + ",\"choch\":" + (bullChochAge <= sequenceWindow ? "true" : "false") + ",\"pd\":" + (bullPdArray ? "true" : "false") + ",\"coil\":" + (coilActive ? "true" : "false") + ",\"vwap_z\":" + str.tostring(vwapZ, "#.2") + "}"
-    alert(payload, alert.freq_once_per_bar_close)
-    lastJevBullBar := bar_index
-if barstate.isconfirmed and jevBearQualified and nz(lastJevBearBar, -1) != bar_index
-    string payload = "{\"type\":\"jev_candidate\",\"symbol\":\"" + syminfo.tickerid + "\",\"tf\":\"" + timeframe.period + "\",\"side\":\"short\",\"score\":" + str.tostring(math.max(bearReversalScore, bearContinuationScore), "#.0") + ",\"rr\":" + str.tostring(bearProjectedRR, "#.2") + ",\"entry\":" + str.tostring(bearEntry, format.mintick) + ",\"stop\":" + str.tostring(bearStop, format.mintick) + ",\"target\":" + str.tostring(bearTarget, format.mintick) + ",\"mtf\":" + str.tostring(mtfBearCount) + ",\"sweep\":" + (bearSweepAge <= sequenceWindow ? "true" : "false") + ",\"smt\":" + (bearSMT or bar_index - bearSmtBarEvent <= sequenceWindow ? "true" : "false") + ",\"choch\":" + (bearChochAge <= sequenceWindow ? "true" : "false") + ",\"pd\":" + (bearPdArray ? "true" : "false") + ",\"coil\":" + (coilActive ? "true" : "false") + ",\"vwap_z\":" + str.tostring(vwapZ, "#.2") + "}"
-    alert(payload, alert.freq_once_per_bar_close)
-    lastJevBearBar := bar_index
-
-alertcondition(bullRevReady or bullContReady, "Institutional Long Ready", "Institutional long candidate meets score and projected R gates")
-alertcondition(bearRevReady or bearContReady, "Institutional Short Ready", "Institutional short candidate meets score and projected R gates")
-
 alertcondition(bullExecutionReady, "Bullish ICT Execution Stack", "Ordered bullish ICT/SMC execution stack is in an entry zone")
 alertcondition(bearExecutionReady, "Bearish ICT Execution Stack", "Ordered bearish ICT/SMC execution stack is in an entry zone")
 alertcondition(bullSmtCount > 0, "Bullish SMT Divergence", "Bullish SMT divergence detected versus configured reference")
 alertcondition(bearSmtCount > 0, "Bearish SMT Divergence", "Bearish SMT divergence detected versus configured reference")
 alertcondition(bullOteEntry, "Bullish OTE Entry Zone", "Price is in bullish OTE discount zone")
 alertcondition(bearOteEntry, "Bearish OTE Entry Zone", "Price is in bearish OTE premium zone")
+
+alertcondition(bullContinuationReady, "Bullish HTF Coil Continuation", "Bullish continuation stack meets lifecycle, MTF and R gates")
+alertcondition(bearContinuationReady, "Bearish HTF Coil Continuation", "Bearish continuation stack meets lifecycle, MTF and R gates")
+
+// Jev is downstream adjudication only: deterministic Pine logic creates the candidate.
+// A webhook service can send this typed state to Jev Choice/Score before any execution layer acts.
+jevBullScore = math.max(bullSetupScore, bullContinuationScore)
+jevBearScore = math.max(bearSetupScore, bearContinuationScore)
+jevBullReady = enableJevExport and jevBullScore >= jevMinScore and (bullExecutionReady or bullContinuationReady) and (not jevRequireRR or bullRRPass)
+jevBearReady = enableJevExport and jevBearScore >= jevMinScore and (bearExecutionReady or bearContinuationReady) and (not jevRequireRR or bearRRPass)
+var int lastJevBullBar = na
+var int lastJevBearBar = na
+
+if barstate.isconfirmed and jevBullReady and nz(lastJevBullBar, -1) != bar_index
+    string payload = "{\"type\":\"jev_candidate\",\"symbol\":\"" + syminfo.tickerid + "\",\"tf\":\"" + timeframe.period + "\",\"side\":\"long\",\"score\":" + str.tostring(jevBullScore, "#.0") + ",\"rr\":" + str.tostring(bullRR, "#.2") + ",\"entry\":" + str.tostring(bullEntry, format.mintick) + ",\"stop\":" + str.tostring(bullStop, format.mintick) + ",\"dol\":" + str.tostring(bullDOL, format.mintick) + ",\"mtf_votes\":" + str.tostring(mtfBullCount) + ",\"sweep\":" + (bullSweepAge <= sequenceWindow ? "true" : "false") + ",\"smt\":" + (bullSmtRecent ? "true" : "false") + ",\"hidden_div\":" + (bullHiddenDivRecent ? "true" : "false") + ",\"fvg\":" + (bullFvgRecent ? "true" : "false") + ",\"ifvg\":" + (bullIfvgRetrace ? "true" : "false") + ",\"ob\":" + (bullObRetrace ? "true" : "false") + ",\"ote\":" + (bullOteEntry ? "true" : "false") + ",\"coil\":" + (coilActive ? "true" : "false") + ",\"vwap_z\":" + str.tostring(vwapZ, "#.2") + "}"
+    alert(payload, alert.freq_once_per_bar_close)
+    lastJevBullBar := bar_index
+
+if barstate.isconfirmed and jevBearReady and nz(lastJevBearBar, -1) != bar_index
+    string payload = "{\"type\":\"jev_candidate\",\"symbol\":\"" + syminfo.tickerid + "\",\"tf\":\"" + timeframe.period + "\",\"side\":\"short\",\"score\":" + str.tostring(jevBearScore, "#.0") + ",\"rr\":" + str.tostring(bearRR, "#.2") + ",\"entry\":" + str.tostring(bearEntry, format.mintick) + ",\"stop\":" + str.tostring(bearStop, format.mintick) + ",\"dol\":" + str.tostring(bearDOL, format.mintick) + ",\"mtf_votes\":" + str.tostring(mtfBearCount) + ",\"sweep\":" + (bearSweepAge <= sequenceWindow ? "true" : "false") + ",\"smt\":" + (bearSmtRecent ? "true" : "false") + ",\"hidden_div\":" + (bearHiddenDivRecent ? "true" : "false") + ",\"fvg\":" + (bearFvgRecent ? "true" : "false") + ",\"ifvg\":" + (bearIfvgRetrace ? "true" : "false") + ",\"ob\":" + (bearObRetrace ? "true" : "false") + ",\"ote\":" + (bearOteEntry ? "true" : "false") + ",\"coil\":" + (coilActive ? "true" : "false") + ",\"vwap_z\":" + str.tostring(vwapZ, "#.2") + "}"
+    alert(payload, alert.freq_once_per_bar_close)
+    lastJevBearBar := bar_index
