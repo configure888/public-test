@@ -33,6 +33,8 @@ class Settings:
     shadow_require_jev: bool = _bool("SHADOW_REQUIRE_JEV", True)
     shadow_min_score: float = float(os.getenv("SHADOW_MIN_SCORE", "78"))
     shadow_min_rr: float = float(os.getenv("SHADOW_MIN_RR", "6"))
+    jev_min_direction_probability: float = float(os.getenv("JEV_MIN_DIRECTION_PROBABILITY", "0.65"))
+    jev_min_setup_probability: float = float(os.getenv("JEV_MIN_SETUP_PROBABILITY", "0.65"))
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "stream_symbols", _list("STREAM_SYMBOLS", "BTCUSDT,ETHUSDT"))
