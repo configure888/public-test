@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Jev Atomic Adjudication",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id","action","direction","direction_probability","setup_probability",
+    "liquidity_safe","toxic_flow","execution_environment"
+  ],
+  "properties": {
+    "event_id": {"type":"string","minLength":5},
+    "action": {"enum":["ACCEPT","ABSTAIN"]},
+    "direction": {"enum":["up","down","unclear"]},
+    "direction_probability": {"type":"number","minimum":0,"maximum":1},
+    "setup_probability": {"type":"number","minimum":0,"maximum":1},
+    "liquidity_safe": {"type":"boolean"},
+    "toxic_flow": {"type":"boolean"},
+    "execution_environment": {"enum":["favorable","marginal","avoid"]},
+    "reason": {"type":["string","null"]}
+  }
+}
