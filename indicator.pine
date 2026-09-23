@@ -303,9 +303,23 @@ bearFvgRecent = bearFvgAge <= fvgMemory
 bullFvgRetrace = not na(bullFvgTop) and not na(bullFvgBar) and bar_index > bullFvgBar and low <= bullFvgTop and high >= bullFvgBottom
 bearFvgRetrace = not na(bearFvgTop) and not na(bearFvgBar) and bar_index > bearFvgBar and high >= bearFvgBottom and low <= bearFvgTop
 
-// Compression state.
-recentRange = ta.highest(high, compressionLen) - ta.lowest(low, compressionLen)
+// Compression state. Precompute history-sensitive series on every bar.
+compressionHigh = ta.highest(high, compressionLen)
+compressionLow = ta.lowest(low, compressionLen)
+recentRange = compressionHigh - compressionLow
 priorRange = recentRange[compressionLen]
+
+// Flag series are also computed globally on every bar so detector toggles/scopes do not
+// create inconsistent historical series.
+flagPoleAtrSeries = nz(ta.sma(atr, flagPoleLen)[flagLen], atrSafe)
+flagLinregNow = ta.linreg(close, flagLen, 0)
+flagLinregBack = ta.linreg(close, flagLen, flagLen - 1)
+flagRecentHighSeries = ta.highest(high, flagLen)
+flagRecentLowSeries = ta.lowest(low, flagLen)
+flagRecentHighPrev = flagRecentHighSeries[1]
+flagRecentLowPrev = flagRecentLowSeries[1]
+flagPoleHighSeries = ta.highest(high, flagPoleLen)[flagLen]
+flagPoleLowSeries = ta.lowest(low, flagPoleLen)[flagLen]
 rangeCompression = not na(priorRange) and priorRange > 0 ? recentRange / priorRange : 1.0
 atrMean = ta.sma(atr, compressionLen)
 priorAtrMean = atrMean[compressionLen]
@@ -475,18 +489,18 @@ f_detect_flag(bool bullish) =>
         float poleEnd = close[flagLen]
         float impulse = poleEnd - poleStart
         float impulseAbs = math.abs(impulse)
-        float poleAtr = nz(ta.sma(atr, flagPoleLen)[flagLen], atrSafe)
-        float recentSlopeTotal = ta.linreg(close, flagLen, 0) - ta.linreg(close, flagLen, flagLen - 1)
-        float flagRange = ta.highest(high, flagLen) - ta.lowest(low, flagLen)
-        float poleRange = (ta.highest(high, flagPoleLen)[flagLen] - ta.lowest(low, flagPoleLen)[flagLen])
+        float poleAtr = flagPoleAtrSeries
+        float recentSlopeTotal = flagLinregNow - flagLinregBack
+        float flagRange = flagRecentHighSeries - flagRecentLowSeries
+        float poleRange = flagPoleHighSeries - flagPoleLowSeries
         bool impulseOk = impulseAbs >= poleAtr * flagImpulseATR
         bool directionOk = bullish ? impulse > 0 : impulse < 0
         bool counterSlope = bullish ? recentSlopeTotal < 0 : recentSlopeTotal > 0
         bool controlled = math.abs(recentSlopeTotal) <= impulseAbs * 0.45 and flagRange <= poleRange * 0.65
         if impulseOk and directionOk and counterSlope and controlled
-            float flagHigh = ta.highest(high, flagLen)
-            float flagLow = ta.lowest(low, flagLen)
-            bool triggered = bullish ? close > flagHigh[1] : close < flagLow[1]
+            float flagHigh = flagRecentHighSeries
+            float flagLow = flagRecentLowSeries
+            bool triggered = bullish ? close > flagRecentHighPrev : close < flagRecentLowPrev
             bool fvgOk = bullish ? bullFvgRecent : bearFvgRecent
             bool dispOk = bullish ? bullDisplacement : bearDisplacement
             bool htfOk = bullish ? htfBull : htfBear
@@ -685,7 +699,7 @@ if detectFVG and bearFvgEvent
 if coilActive
     float maturity = f_clamp((compressionRatio - rangeCompression) / math.max(compressionRatio, 0.01) + 0.5, 0.0, 1.0)
     float sc = 45.0 + maturity * 30.0
-    f_add_pattern(patterns, PatternInfo.new("HTF/Local Coil", "neutral", sc, rangeCompression < compressionRatio * 0.80 ? "Mature" : "Forming", bar_index - compressionLen, bar_index, ta.highest(high, compressionLen), ta.lowest(low, compressionLen), na, "Range ratio " + str.tostring(rangeCompression, "#.##") + "\nATR ratio " + str.tostring(atrCompression, "#.##") + "\nExpansion risk rising"))
+    f_add_pattern(patterns, PatternInfo.new("HTF/Local Coil", "neutral", sc, rangeCompression < compressionRatio * 0.80 ? "Mature" : "Forming", bar_index - compressionLen, bar_index, compressionHigh, compressionLow, na, "Range ratio " + str.tostring(rangeCompression, "#.##") + "\nATR ratio " + str.tostring(atrCompression, "#.##") + "\nExpansion risk rising"))
 
 if detectSequence
     f_add_pattern(patterns, f_detect_sequence(true))
