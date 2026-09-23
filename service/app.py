@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from config import settings
 from storage import Store
+from jev_request import build_request
 from venues import (
     choose_venue,
     live_snapshot,
@@ -26,6 +27,9 @@ class JevDecision(BaseModel):
     direction: str | None = None
     direction_probability: float | None = Field(default=None, ge=0, le=1)
     setup_probability: float | None = Field(default=None, ge=0, le=1)
+    liquidity_safe: bool | None = None
+    toxic_flow: bool | None = None
+    execution_environment: str | None = None
     reason: str | None = None
 
 
@@ -40,6 +44,21 @@ def _passes_shadow_gate(payload: dict[str, Any]) -> bool:
     except (TypeError, ValueError):
         return False
     return bool(payload.get("a_plus", False)) and score >= settings.shadow_min_score and rr >= settings.shadow_min_rr
+
+
+def _jev_passes(side: str, decision: JevDecision) -> bool:
+    expected = "up" if side == "long" else "down" if side == "short" else "invalid"
+    return (
+        decision.action == "ACCEPT"
+        and decision.direction == expected
+        and decision.direction_probability is not None
+        and decision.direction_probability >= settings.jev_min_direction_probability
+        and decision.setup_probability is not None
+        and decision.setup_probability >= settings.jev_min_setup_probability
+        and decision.liquidity_safe is True
+        and decision.toxic_flow is False
+        and decision.execution_environment in {"favorable", "marginal"}
+    )
 
 
 async def _enrich(event_id: str, payload: dict[str, Any]) -> None:
@@ -98,8 +117,8 @@ def jev(token: str, decision: JevDecision) -> dict[str, Any]:
     store.record_jev(decision.event_id, data)
 
     armed = False
-    if decision.action == "ACCEPT":
-        payload = event["payload"]
+    payload = event["payload"]
+    if _jev_passes(str(payload.get("side", "")).lower(), decision):
         if _passes_shadow_gate(payload):
             raw_symbol = str(payload.get("symbol", ""))
             venue = choose_venue(raw_symbol, settings.primary_venue)
@@ -114,3 +133,13 @@ def event(event_id: str) -> dict[str, Any]:
     if out is None:
         raise HTTPException(404, "event not found")
     return out
+
+
+@app.get("/jev/request/{event_id}")
+def jev_request(event_id: str) -> dict[str, Any]:
+    out = store.get_event(event_id)
+    if out is None:
+        raise HTTPException(404, "event not found")
+    if out.get("enrichment") is None:
+        raise HTTPException(409, "event not enriched yet")
+    return build_request(out)
