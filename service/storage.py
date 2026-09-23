@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import threading
 import time
@@ -71,6 +72,8 @@ class Store:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         self.path = path
         self._lock = threading.Lock()
+        self._puts = 0
+        self._snapshot_max_rows = int(os.getenv("SNAPSHOT_RETENTION_ROWS", "500000"))
         with self._connect() as db:
             db.executescript(SCHEMA)
 
@@ -114,8 +117,13 @@ class Store:
                 "INSERT INTO snapshots(venue,symbol,ts_ms,features_json) VALUES(?,?,?,?)",
                 (venue, symbol, int(ts_ms), json.dumps(features, separators=(",", ":"), sort_keys=True)),
             )
-            # Bound local research storage. Historical archival belongs in object storage/parquet later.
-            db.execute("DELETE FROM snapshots WHERE id IN (SELECT id FROM snapshots ORDER BY id DESC LIMIT -1 OFFSET 500000)")
+            self._puts += 1
+            # Prune in batches instead of issuing an expensive retention DELETE on every market tick.
+            if self._snapshot_max_rows > 0 and self._puts % 1000 == 0:
+                db.execute(
+                    "DELETE FROM snapshots WHERE id IN (SELECT id FROM snapshots ORDER BY id DESC LIMIT -1 OFFSET ?)",
+                    (self._snapshot_max_rows,),
+                )
 
     def nearest_snapshot(self, venue: str, symbol: str, ts_ms: int, max_age_ms: int) -> dict[str, Any] | None:
         with self._connect() as db:
@@ -196,3 +204,17 @@ class Store:
                 "shadow_open": db.execute("SELECT COUNT(*) FROM shadow_trades WHERE status='OPEN'").fetchone()[0],
                 "shadow_closed": db.execute("SELECT COUNT(*) FROM shadow_trades WHERE status!='OPEN'").fetchone()[0],
             }
+
+    def latest_snapshots(self) -> list[dict[str, Any]]:
+        with self._connect() as db:
+            rows = db.execute(
+                """SELECT s.venue,s.symbol,s.ts_ms
+                   FROM snapshots s
+                   JOIN (
+                     SELECT venue,symbol,MAX(ts_ms) AS max_ts
+                     FROM snapshots GROUP BY venue,symbol
+                   ) x ON x.venue=s.venue AND x.symbol=s.symbol AND x.max_ts=s.ts_ms
+                   ORDER BY s.venue,s.symbol"""
+            ).fetchall()
+        now = int(time.time()*1000)
+        return [{"venue":r["venue"],"symbol":r["symbol"],"ts_ms":r["ts_ms"],"age_ms":now-int(r["ts_ms"])} for r in rows]
