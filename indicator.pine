@@ -356,10 +356,7 @@ f_detect_double(array<float> prices, array<int> bars, array<int> kinds, bool bul
                 float extreme = (p0 + p2) / 2.0
                 float target = bullish ? neckline + (neckline - extreme) : neckline - (extreme - neckline)
                 string stage = f_stage(triggered, dispOk or fvgOk)
-                string reason = "Swing equality " + str.tostring(geometry * 100.0, "#") + "%\n" +
-                    (swept ? "Liquidity sweep: yes\n" : "Liquidity sweep: no\n") +
-                    (triggered ? "Neckline: broken\n" : "Neckline: intact\n") +
-                    (fvgOk ? "FVG context: yes" : "FVG context: no")
+                string reason = "Swing equality " + str.tostring(geometry * 100.0, "#") + "%\n" + (swept ? "Liquidity sweep: yes\n" : "Liquidity sweep: no\n") + (triggered ? "Neckline: broken\n" : "Neckline: intact\n") + (fvgOk ? "FVG context: yes" : "FVG context: no")
                 out := PatternInfo.new(bullish ? "Double Bottom" : "Double Top", bullish ? "bullish" : "bearish", score, stage, b0, bar_index, bullish ? neckline : extreme, bullish ? extreme : neckline, target, reason)
     out
 
