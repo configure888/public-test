@@ -1,0 +1,26 @@
+name: Research Tools
+
+on:
+  push:
+    paths:
+      - 'research/**'
+      - '.github/workflows/research-tools.yml'
+  pull_request:
+    paths:
+      - 'research/**'
+      - '.github/workflows/research-tools.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compile Python
+        run: python -m py_compile research/*.py
+      - name: Run research tests
+        working-directory: research
+        run: python -m unittest -v test_research.py
