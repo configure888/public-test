@@ -1,0 +1,54 @@
+name: Meta Model Pipeline
+
+on:
+  push:
+    paths:
+      - 'research/train_meta.py'
+      - 'research/build_dataset.py'
+      - 'research/stability_surface.py'
+      - 'research/feature_ablation.py'
+      - 'research/requirements-ml.txt'
+      - '.github/workflows/ml-pipeline.yml'
+  pull_request:
+    paths:
+      - 'research/train_meta.py'
+      - 'research/build_dataset.py'
+      - 'research/stability_surface.py'
+      - 'research/feature_ablation.py'
+      - 'research/requirements-ml.txt'
+      - '.github/workflows/ml-pipeline.yml'
+  workflow_dispatch:
+
+jobs:
+  synthetic-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install -r research/requirements-ml.txt
+      - name: Build deterministic synthetic labeled dataset
+        run: |
+          python - <<'PY'
+          import csv, math, pathlib
+          p=pathlib.Path('/tmp/meta.csv')
+          fields=['time','received_ms','symbol','tf','side','family','grouped_score','legacy_score','rr','structure_bucket','liquidity_bucket','pd_bucket','narrative_bucket','quality_bucket','rr_bucket','mtf_votes','sweep','smt','regular_div','hidden_div','fvg','ifvg','ob','ote','coil','killzone','vwap_z','micro_venue','micro_capture_distance_ms','micro_stale','micro_spread_bps','micro_microprice_edge_bps','micro_book_imbalance_5','micro_book_imbalance_10','micro_book_imbalance_20','micro_trade_count','micro_trade_imbalance','micro_cvd_qty','micro_cvd_notional','micro_buy_notional_ratio','micro_trade_window_ms','micro_basis_bps','micro_funding_rate','micro_open_interest','micro_day_notional_volume','six_r_before_stop','contract_r']
+          with p.open('w',newline='') as f:
+              w=csv.DictWriter(f,fieldnames=fields); w.writeheader()
+              for i in range(600):
+                  good=(i%5)!=0
+                  score=82 if good else 55
+                  win=1 if ((i*17)%100)<(72 if good else 28) else 0
+                  row={k:0 for k in fields}
+                  row.update(time=1_700_000_000_000+i*300_000,received_ms=1_700_000_000_100+i*300_000,symbol='BTCUSDT' if i%2 else 'ETHUSDT',tf='5',side='long' if i%2 else 'short',family='reversal' if i%3 else 'continuation',grouped_score=score,legacy_score=score,rr=6.5 if good else 3.0,structure_bucket=25 if good else 12,liquidity_bucket=15 if good else 5,pd_bucket=16 if good else 7,narrative_bucket=12 if good else 5,quality_bucket=8 if good else 3,rr_bucket=10 if good else 3,mtf_votes=3 if good else 1,sweep=int(good),smt=int(i%4==0),regular_div=int(i%7==0),hidden_div=int(i%6==0),fvg=1,ifvg=int(i%3==0),ob=int(i%2==0),ote=int(good),coil=int(i%3==0),killzone=int(i%4!=0),vwap_z=(-1 if i%2 else 1)*0.5,micro_venue='hyperliquid',micro_capture_distance_ms=250,micro_stale=0,micro_spread_bps=0.8 if good else 3.5,micro_microprice_edge_bps=0.2 if good else -0.1,micro_book_imbalance_5=0.25 if good else -0.05,micro_book_imbalance_10=0.2 if good else -0.03,micro_book_imbalance_20=0.15 if good else 0,micro_trade_count=100,micro_trade_imbalance=0.2 if good else -0.1,micro_cvd_qty=10 if good else -2,micro_cvd_notional=10000 if good else -2000,micro_buy_notional_ratio=0.6 if good else 0.45,micro_trade_window_ms=30000,micro_basis_bps=1.0,micro_funding_rate=0.00001,micro_open_interest=100000,micro_day_notional_volume=10000000,six_r_before_stop=win,contract_r=6 if win else -1)
+                  w.writerow(row)
+          print(p)
+          PY
+      - name: Train and calibrate
+        run: python research/train_meta.py --data /tmp/meta.csv --out-dir /tmp/meta-model --min-rows 300
+      - name: Stability surface
+        run: python research/stability_surface.py --data /tmp/meta.csv --out /tmp/stability.csv
+      - name: Feature ablation
+        run: python research/feature_ablation.py --data /tmp/meta.csv --out /tmp/ablation.json
